@@ -37,7 +37,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.repo.outputs.IMAGE_NAME }}:latest
+          tags: |
+            ${{ steps.repo.outputs.IMAGE_NAME }}:latest
+            ${{ steps.repo.outputs.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-

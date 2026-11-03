@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
+  Terminal,
   X,
 } from "lucide-react";
 import { ShowUpTenant } from "@/lib/types";
@@ -44,12 +45,13 @@ export function EmbeddedSignupModal({
   onConnected,
 }: EmbeddedSignupModalProps) {
   const [activeTab, setActiveTab] = useState<"embedded" | "direct">("embedded");
-  const [appId, setAppId] = useState(defaultAppId || "");
+  const [appId, setAppId] = useState(defaultAppId || "946759377779936");
   const [configId, setConfigId] = useState(defaultConfigId || "1433645942194259");
   const [sdkReady, setSdkReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
 
   // Direct / Developer token inputs
   const [manualWabaId, setManualWabaId] = useState(tenant.waba_id || "");
@@ -59,8 +61,26 @@ export function EmbeddedSignupModal({
   );
   const [manualToken, setManualToken] = useState("");
 
+  const addLog = (msg: string, data?: unknown) => {
+    const time = new Date().toLocaleTimeString();
+    const line = `[${time}] ${msg}`;
+    console.log(
+      `%c[ShowUp WhatsApp]%c ${line}`,
+      "color: #25D366; font-weight: bold;",
+      "color: #38bdf8;",
+      data !== undefined ? data : ""
+    );
+    setLogs((prev) => [...prev.slice(-30), line]);
+  };
+
   useEffect(() => {
     if (!isOpen) return;
+
+    addLog("Embedded Signup Modal opened", {
+      configId,
+      appId,
+      origin: window.location.origin,
+    });
 
     const handleMessage = (event: MessageEvent) => {
       if (
@@ -69,18 +89,24 @@ export function EmbeddedSignupModal({
       ) {
         return;
       }
+      addLog(`Received postMessage from ${event.origin}`, event.data);
+
       try {
         const data =
           typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+
         if (data?.type === "WA_EMBEDDED_SIGNUP") {
+          addLog(`Embedded Signup Event: ${data.event}`, data.data);
+
           if (data.event === "FINISH" && data.data) {
             const { phone_number_id, waba_id } = data.data;
             if (waba_id) sessionStorage.setItem("showup_waba_id", waba_id);
             if (phone_number_id)
               sessionStorage.setItem("showup_phone_number_id", phone_number_id);
-            setStatusMessage(
-              `Captured WABA (${waba_id}) & Phone ID (${phone_number_id}) from Meta popup!`
-            );
+
+            const captured = `Captured WABA ID: ${waba_id} | Phone ID: ${phone_number_id}`;
+            setStatusMessage(captured);
+            addLog(`SUCCESS: ${captured}`);
           }
         }
       } catch {
@@ -90,36 +116,54 @@ export function EmbeddedSignupModal({
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [isOpen]);
+  }, [isOpen, configId, appId]);
 
-  const initFbSdk = (targetAppId: string) => {
-    return new Promise<void>((resolve, reject) => {
-      if (!targetAppId.trim()) {
-        reject(new Error("Please enter your Meta App ID first."));
+  const initFbSdk = (targetAppId: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const cleanAppId = targetAppId.trim();
+      if (!cleanAppId) {
+        const err = "Please enter your Meta App ID first.";
+        addLog(`ERROR: ${err}`);
+        reject(new Error(err));
         return;
       }
 
       if (window.FB) {
-        window.FB.init({
-          appId: targetAppId.trim(),
-          cookie: true,
-          xfbml: true,
-          version: "v21.0",
-        });
-        setSdkReady(true);
-        resolve();
-        return;
+        addLog("window.FB already present, re-initializing...", { appId: cleanAppId });
+        try {
+          window.FB.init({
+            appId: cleanAppId,
+            cookie: true,
+            xfbml: true,
+            version: "v21.0",
+          });
+          setSdkReady(true);
+          addLog("FB SDK initialized successfully");
+          resolve();
+          return;
+        } catch (initErr) {
+          addLog("FB.init error:", initErr);
+        }
       }
 
+      addLog("Injecting https://connect.facebook.net/en_US/sdk.js into DOM...");
+
       window.fbAsyncInit = function () {
-        window.FB?.init({
-          appId: targetAppId.trim(),
-          cookie: true,
-          xfbml: true,
-          version: "v21.0",
-        });
-        setSdkReady(true);
-        resolve();
+        addLog("window.fbAsyncInit triggered by Meta SDK");
+        try {
+          window.FB?.init({
+            appId: cleanAppId,
+            cookie: true,
+            xfbml: true,
+            version: "v21.0",
+          });
+          setSdkReady(true);
+          addLog("FB SDK init complete via fbAsyncInit");
+          resolve();
+        } catch (e) {
+          addLog("Error inside fbAsyncInit:", e);
+          reject(e);
+        }
       };
 
       const existing = document.getElementById("facebook-jssdk");
@@ -132,80 +176,43 @@ export function EmbeddedSignupModal({
       js.src = "https://connect.facebook.net/en_US/sdk.js";
       js.async = true;
       js.defer = true;
-      js.onerror = () =>
-        reject(
-          new Error(
-            "Could not load Facebook SDK. Check if an adblocker is blocking connect.facebook.net."
-          )
-        );
+      js.onerror = () => {
+        const msg = "Could not load Facebook SDK script. Check if an adblocker is active.";
+        addLog(`ERROR: ${msg}`);
+        reject(new Error(msg));
+      };
       document.body.appendChild(js);
     });
   };
 
-  const launchEmbeddedSignupPopup = async () => {
+  const launchEmbeddedSignupPopup = () => {
     setError(null);
     setStatusMessage(null);
 
-    if (!appId.trim()) {
-      setError(
-        "Enter your 15-digit Meta App ID above so Facebook Login for Business can initialize."
-      );
+    const cleanAppId = appId.trim();
+    const cleanConfigId = configId.trim();
+
+    if (!cleanAppId) {
+      const msg = "Enter your Meta App ID above so Facebook Login can initialize.";
+      setError(msg);
+      addLog(`VALIDATION: ${msg}`);
       return;
     }
 
-    try {
-      setLoading(true);
-      await initFbSdk(appId);
+    addLog("Starting Embedded Signup launch flow...", {
+      appId: cleanAppId,
+      configId: cleanConfigId,
+    });
+    setLoading(true);
 
-      if (!window.FB) {
-        throw new Error("Facebook JS SDK did not initialize.");
-      }
+    initFbSdk(cleanAppId)
+      .then(() => {
+        if (!window.FB) {
+          throw new Error("Facebook JS SDK not found on window object.");
+        }
 
-      window.FB.login(
-        function (response) {
-          if (response?.authResponse?.code) {
-            const code = response.authResponse.code;
-            const wabaId =
-              sessionStorage.getItem("showup_waba_id") || manualWabaId;
-            const phoneNumberId =
-              sessionStorage.getItem("showup_phone_number_id") || manualPhoneId;
-
-            setStatusMessage(
-              "Exchanging authorization code & provisioning 5 Webinar Templates..."
-            );
-
-            fetch("/api/whatsapp/embedded-signup/callback", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                code,
-                wabaId,
-                phoneNumberId,
-              }),
-            })
-              .then(async (res) => {
-                const data = await res.json();
-                if (!res.ok || data.error) {
-                  throw new Error(data.error || "Failed onboarding WABA");
-                }
-                onConnected(data.tenant);
-                onClose();
-              })
-              .catch((err: unknown) => {
-                setError(
-                  err instanceof Error ? err.message : "Failed completing callback"
-                );
-              })
-              .finally(() => {
-                setLoading(false);
-              });
-          } else {
-            setLoading(false);
-            setStatusMessage("Popup closed before authorization completed.");
-          }
-        },
-        {
-          config_id: configId.trim(),
+        const loginOptions = {
+          config_id: cleanConfigId,
           response_type: "code",
           override_default_response_type: true,
           extras: {
@@ -213,64 +220,137 @@ export function EmbeddedSignupModal({
             featureType: "",
             sessionInfoVersion: "3",
           },
-        }
-      );
-    } catch (err: unknown) {
-      setLoading(false);
-      setError(err instanceof Error ? err.message : "Failed launching popup");
-    }
+        };
+
+        addLog("Calling window.FB.login with options:", loginOptions);
+
+        // Standard function callback to satisfy Meta's legacy validator
+        window.FB.login(
+          function (response) {
+            addLog("FB.login response received:", response);
+
+            if (response?.authResponse?.code) {
+              const code = response.authResponse.code;
+              const wabaId =
+                sessionStorage.getItem("showup_waba_id") || manualWabaId;
+              const phoneNumberId =
+                sessionStorage.getItem("showup_phone_number_id") || manualPhoneId;
+
+              addLog("Auth Code captured successfully:", {
+                codeLength: code.length,
+                wabaId,
+                phoneNumberId,
+              });
+
+              setStatusMessage(
+                "Exchanging authorization code & provisioning 5 Webinar Templates..."
+              );
+
+              fetch("/api/whatsapp/embedded-signup/callback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  code,
+                  wabaId,
+                  phoneNumberId,
+                }),
+              })
+                .then(function (res) {
+                  return res.json().then(function (data) {
+                    if (!res.ok || data.error) {
+                      throw new Error(data.error || "Failed onboarding WABA");
+                    }
+                    addLog("Backend onboarding complete!", data);
+                    onConnected(data.tenant);
+                    onClose();
+                  });
+                })
+                .catch(function (err) {
+                  const errorMsg =
+                    err instanceof Error ? err.message : "Failed completing callback";
+                  addLog(`ERROR: ${errorMsg}`);
+                  setError(errorMsg);
+                })
+                .finally(function () {
+                  setLoading(false);
+                });
+            } else {
+              setLoading(false);
+              const cancelMsg = "Popup closed before authorization completed.";
+              addLog(`INFO: ${cancelMsg}`);
+              setStatusMessage(cancelMsg);
+            }
+          },
+          loginOptions
+        );
+      })
+      .catch((err: unknown) => {
+        setLoading(false);
+        const errMsg = err instanceof Error ? err.message : "Failed launching popup";
+        addLog(`CATCH: ${errMsg}`);
+        setError(errMsg);
+      });
   };
 
-  const handleDirectTokenConnect = async (useSandboxDemo = false) => {
+  const handleDirectTokenConnect = (useSandboxDemo = false) => {
     setError(null);
     setLoading(true);
 
-    try {
-      const payload = useSandboxDemo
-        ? {
-            wabaId: "waba_ke_demo_99201",
-            phoneNumberId: "phone_ke_demo_88120",
-            displayPhoneNumber: "+254 712 345 678",
-            accessToken: "demo_permanent_system_user_token",
+    const payload = useSandboxDemo
+      ? {
+          wabaId: "waba_ke_demo_99201",
+          phoneNumberId: "phone_ke_demo_88120",
+          displayPhoneNumber: "+254 712 345 678",
+          accessToken: "demo_permanent_system_user_token",
+        }
+      : {
+          wabaId: manualWabaId.trim(),
+          phoneNumberId: manualPhoneId.trim(),
+          displayPhoneNumber: manualDisplayPhone.trim(),
+          accessToken: manualToken.trim(),
+        };
+
+    addLog(
+      useSandboxDemo
+        ? "Activating Sandbox Demo WABA..."
+        : "Connecting via Direct System Token...",
+      payload
+    );
+
+    fetch("/api/whatsapp/embedded-signup/callback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(function (res) {
+        return res.json().then(function (data) {
+          if (!res.ok || data.error) {
+            throw new Error(data.error || "Connection failed");
           }
-        : {
-            wabaId: manualWabaId.trim(),
-            phoneNumberId: manualPhoneId.trim(),
-            displayPhoneNumber: manualDisplayPhone.trim(),
-            accessToken: manualToken.trim(),
-          };
-
-      if (!payload.wabaId || !payload.phoneNumberId || !payload.accessToken) {
-        throw new Error(
-          "Please provide WABA ID, Phone Number ID, and System User Access Token."
-        );
-      }
-
-      const res = await fetch("/api/whatsapp/embedded-signup/callback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+          addLog("Direct token connection successful!", data);
+          onConnected(data.tenant);
+          onClose();
+        });
+      })
+      .catch(function (err) {
+        const msg = err instanceof Error ? err.message : "Connection failed";
+        addLog(`ERROR: ${msg}`);
+        setError(msg);
+      })
+      .finally(function () {
+        setLoading(false);
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Connection failed");
-      }
-
-      onConnected(data.tenant);
-      onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Connection failed");
-    } finally {
-      setLoading(false);
-    }
   };
+
+  const directMetaHostedUrl = `https://business.facebook.com/messaging/whatsapp/onboard/?app_id=${encodeURIComponent(
+    appId.trim()
+  )}&config_id=${encodeURIComponent(configId.trim())}`;
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl my-6">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/60">
           <div className="flex items-center gap-3">
@@ -320,7 +400,7 @@ export function EmbeddedSignupModal({
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-4">
           {error && (
             <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
               {error}
@@ -349,7 +429,7 @@ export function EmbeddedSignupModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">
-                      Configuration ID (from your Meta Portal)
+                      Configuration ID
                     </label>
                     <input
                       type="text"
@@ -360,11 +440,10 @@ export function EmbeddedSignupModal({
                   </div>
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">
-                      Meta App ID (top-left of Meta Portal)
+                      Meta App ID
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 108294817263541"
                       value={appId}
                       onChange={(e) => setAppId(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm font-mono focus:outline-none focus:border-emerald-500"
@@ -372,47 +451,56 @@ export function EmbeddedSignupModal({
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Note: Meta&apos;s JS SDK requires an <strong>HTTPS</strong> origin (or{" "}
-                  <code className="text-slate-300">localhost</code> added to your Meta{" "}
-                  <strong>Manage Domains allow list</strong>). When the client finishes the
-                  popup, ShowUp Engine automatically registers their number and creates all 5
-                  webinar templates.
-                </p>
-              </div>
-
-              <div className="bg-slate-950/50 border border-slate-800/80 rounded-xl p-4 space-y-2">
-                <div className="text-xs font-medium text-slate-300">
-                  What happens automatically after the client clicks &ldquo;Finish&rdquo;:
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Origin: <code className="text-emerald-300">{typeof window !== "undefined" ? window.location.origin : ""}</code></span>
+                  <a
+                    href={directMetaHostedUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    Open Meta-Hosted Onboarding URL
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
-                <ul className="text-xs text-slate-400 space-y-1.5">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    Exchanges OAuth code for a non-expiring System User Access Token
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    Calls <code className="text-slate-300">POST /&#123;waba_id&#125;/subscribed_apps</code> to attach webhooks
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    Calls <code className="text-slate-300">POST /&#123;phone_number_id&#125;/register</code> to activate Cloud API
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    Provisions the 5 pre-approved Utility &amp; Marketing Webinar Templates
-                  </li>
-                </ul>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              {/* In-App Live Debug Console */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="flex items-center gap-1.5 font-mono text-[11px] text-slate-300">
+                    <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                    Live Debug Event Stream (Check F12 Console for full logs)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setLogs([])}
+                    className="text-[10px] text-slate-500 hover:text-slate-300"
+                  >
+                    Clear Logs
+                  </button>
+                </div>
+                <div className="h-28 overflow-y-auto font-mono text-[11px] text-slate-300 bg-black/60 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
+                  {logs.length === 0 ? (
+                    <span className="text-slate-600">Waiting for actions... click &quot;Launch Meta Embedded Signup&quot; to begin.</span>
+                  ) : (
+                    logs.map((log, i) => (
+                      <div key={i} className="leading-tight break-all">
+                        {log}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => handleDirectTokenConnect(true)}
                   disabled={loading}
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-xs font-medium text-slate-300 transition"
                 >
-                  Activate Sandbox Demo WABA (Instant Test)
+                  Activate Sandbox Demo WABA
                 </button>
 
                 <button
@@ -426,16 +514,14 @@ export function EmbeddedSignupModal({
                   ) : (
                     <ExternalLink className="w-4 h-4" />
                   )}
-                  {sdkReady ? "Launch Meta Embedded Signup" : "Launch Meta Embedded Signup"}
+                  Launch Meta Embedded Signup
                 </button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               <p className="text-xs text-slate-400">
-                Use this tab to connect a client via a direct System User Token (for Concierge
-                Pilots #1–5 or testing on <code className="text-slate-300">http://localhost</code>{" "}
-                without an HTTPS tunnel).
+                Use this tab to connect via a direct System User Token (for Concierge Pilots #1–5).
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -523,4 +609,3 @@ export function EmbeddedSignupModal({
     </div>
   );
 }
-
