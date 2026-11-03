@@ -47,7 +47,6 @@ export function EmbeddedSignupModal({
   const [activeTab, setActiveTab] = useState<"embedded" | "direct">("embedded");
   const [appId, setAppId] = useState(defaultAppId || "946759377779936");
   const [configId, setConfigId] = useState(defaultConfigId || "1433645942194259");
-  const [sdkReady, setSdkReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +65,7 @@ export function EmbeddedSignupModal({
     const line = `[${time}] ${msg}`;
     console.log(
       `%c[ShowUp WhatsApp]%c ${line}`,
-      "color: #25D366; font-weight: bold;",
+      "background: #25D366; color: #022c22; font-weight: bold; border-radius: 3px; padding: 1px 5px;",
       "color: #38bdf8;",
       data !== undefined ? data : ""
     );
@@ -100,9 +99,14 @@ export function EmbeddedSignupModal({
 
           if (data.event === "FINISH" && data.data) {
             const { phone_number_id, waba_id } = data.data;
-            if (waba_id) sessionStorage.setItem("showup_waba_id", waba_id);
-            if (phone_number_id)
+            if (waba_id) {
+              sessionStorage.setItem("showup_waba_id", waba_id);
+              setManualWabaId(waba_id);
+            }
+            if (phone_number_id) {
               sessionStorage.setItem("showup_phone_number_id", phone_number_id);
+              setManualPhoneId(phone_number_id);
+            }
 
             const captured = `Captured WABA ID: ${waba_id} | Phone ID: ${phone_number_id}`;
             setStatusMessage(captured);
@@ -129,16 +133,16 @@ export function EmbeddedSignupModal({
       }
 
       if (window.FB) {
-        addLog("window.FB already present, re-initializing...", { appId: cleanAppId });
+        addLog("window.FB already loaded, re-initializing...", { appId: cleanAppId });
         try {
           window.FB.init({
             appId: cleanAppId,
+            autoLogAppEvents: true,
             cookie: true,
             xfbml: true,
-            version: "v21.0",
+            version: "v26.0",
           });
-          setSdkReady(true);
-          addLog("FB SDK initialized successfully");
+          addLog("FB SDK initialized successfully (v26.0)");
           resolve();
           return;
         } catch (initErr) {
@@ -153,12 +157,12 @@ export function EmbeddedSignupModal({
         try {
           window.FB?.init({
             appId: cleanAppId,
+            autoLogAppEvents: true,
             cookie: true,
             xfbml: true,
-            version: "v21.0",
+            version: "v26.0",
           });
-          setSdkReady(true);
-          addLog("FB SDK init complete via fbAsyncInit");
+          addLog("FB SDK init complete via fbAsyncInit (v26.0)");
           resolve();
         } catch (e) {
           addLog("Error inside fbAsyncInit:", e);
@@ -216,7 +220,11 @@ export function EmbeddedSignupModal({
           response_type: "code",
           override_default_response_type: true,
           extras: {
-            setup: {},
+            setup: {
+              sessionInfoVersion: "3",
+              version: "4",
+              featureType: "None",
+            },
             featureType: "",
             sessionInfoVersion: "3",
           },
@@ -229,7 +237,7 @@ export function EmbeddedSignupModal({
           function (response) {
             addLog("FB.login response received:", response);
 
-            if (response?.authResponse?.code) {
+            if (response && response.authResponse && response.authResponse.code) {
               const code = response.authResponse.code;
               const wabaId =
                 sessionStorage.getItem("showup_waba_id") || manualWabaId;
@@ -344,7 +352,17 @@ export function EmbeddedSignupModal({
 
   const directMetaHostedUrl = `https://business.facebook.com/messaging/whatsapp/onboard/?app_id=${encodeURIComponent(
     appId.trim()
-  )}&config_id=${encodeURIComponent(configId.trim())}`;
+  )}&config_id=${encodeURIComponent(
+    configId.trim()
+  )}&extras=${encodeURIComponent(
+    JSON.stringify({
+      setup: {
+        sessionInfoVersion: "3",
+        version: "4",
+        featureType: "None",
+      },
+    })
+  )}`;
 
   if (!isOpen) return null;
 
@@ -385,7 +403,7 @@ export function EmbeddedSignupModal({
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            1-Click Meta Embedded Signup Popup
+            1-Click Meta Embedded Signup
           </button>
           <button
             onClick={() => setActiveTab("direct")}
@@ -503,19 +521,31 @@ export function EmbeddedSignupModal({
                   Activate Sandbox Demo WABA
                 </button>
 
-                <button
-                  type="button"
-                  onClick={launchEmbeddedSignupPopup}
-                  disabled={loading}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-                >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <ExternalLink className="w-4 h-4" />
-                  )}
-                  Launch Meta Embedded Signup
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <a
+                    href={directMetaHostedUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 text-xs font-semibold transition"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Open Meta Hosted Page
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={launchEmbeddedSignupPopup}
+                    disabled={loading}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ExternalLink className="w-4 h-4" />
+                    )}
+                    Launch Meta Embedded Signup
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
