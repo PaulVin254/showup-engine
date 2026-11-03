@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+// Next 14.2's next/font/google does not ship Geist, so we use the official
+// `geist` package, which wraps next/font/local with the same CSS variables.
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { NavigationLogger } from "@/components/NavigationLogger";
 
@@ -14,8 +18,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-slate-950">
+    <html lang="en" className={`dark ${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="min-h-screen bg-canvas text-slate-100 font-sans antialiased">
         <NavigationLogger />
         {children}
       </body>

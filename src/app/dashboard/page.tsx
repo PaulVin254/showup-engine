@@ -44,6 +44,7 @@ import {
 import { formatPhoneDisplay } from "@/lib/phone";
 import { EmbeddedSignupModal } from "@/components/whatsapp/EmbeddedSignupModal";
 import { RoiReportModal } from "@/components/roi/RoiReportModal";
+import { BrandWordmark } from "@/components/BrandMark";
 
 const STAGES_META: Array<{
   key: SequenceStage;
@@ -383,57 +384,89 @@ export default function DashboardPage() {
 
   if (loading || !tenant) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-300">
-        <Loader2 className="w-6 h-6 animate-spin mr-2 text-emerald-400" />
+      <div className="min-h-screen bg-canvas flex items-center justify-center text-[#94a3b8]">
+        <Loader2 className="w-6 h-6 animate-spin mr-2 text-electric-hover" />
         Loading ShowUp Engine Command Center...
       </div>
     );
   }
 
+  const extraAttendeesCount = Math.max(
+    0,
+    attendedCount - Math.round((baselinePct / 100) * totalRegCount)
+  );
+  const attributedSalesKes = Math.round(
+    extraAttendeesCount * ((activeEvent?.expected_close_rate || 6) / 100) * (activeEvent?.offer_price_kes || 0)
+  );
+  const roiMultiple = (attributedSalesKes / 4999).toFixed(1);
+  const formatKesShort = (n: number) =>
+    n >= 1_000_000 ? `KES ${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `KES ${Math.round(n / 1000)}k` : `KES ${n}`;
+
   const originUrl =
     typeof window !== "undefined" ? window.location.origin : "http://localhost:3005";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* Top SaaS Bar */}
-      <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-canvas text-slate-100 flex flex-col">
+      {/* Edge-to-edge Muse command bar */}
+      <header className="sticky top-0 z-30 w-full px-6 sm:px-10 py-4 bg-canvas/90 backdrop-blur-md border-b border-white/[0.06]">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                <MessageSquare className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="font-bold text-white tracking-tight">
-                  ShowUp<span className="text-emerald-400">Engine</span>
-                </span>
-                <span className="block text-[10px] text-slate-400">
-                  {tenant.business_name}
-                </span>
-              </div>
+            <Link href="/">
+              <BrandWordmark subtitle={tenant.business_name} />
             </Link>
 
-            <span className="hidden md:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
-              Plan:{" "}
-              <strong className="text-emerald-400 uppercase">{tenant.plan_tier}</strong> (
-              {tenant.registrants_used_this_month} / {tenant.registrant_limit} leads)
+            <span className="hidden lg:inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-[#25272c] text-[#9ca3af]">
+              <strong className="text-white uppercase font-medium">{tenant.plan_tier}</strong>
+              <span className="font-mono tracking-tight">
+                {tenant.registrants_used_this_month}/{tenant.registrant_limit}
+              </span>
+              leads
             </span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          {/* Pill navigation tabs */}
+          <nav className="order-3 md:order-2 w-full md:w-auto flex justify-center">
+            <div className="inline-flex gap-1 p-1 rounded-full bg-[#17191e] border border-white/[0.06] overflow-x-auto max-w-full">
+              {[
+                { id: "events", label: "Events", icon: LayoutDashboard },
+                { id: "templates", label: "Templates", icon: Sparkles },
+                { id: "whatsapp", label: "WhatsApp API", icon: Smartphone },
+                { id: "billing", label: "Billing", icon: CreditCard },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                    className={`px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 whitespace-nowrap transition ${
+                      isActive
+                        ? "bg-[#25272c] text-white"
+                        : "text-[#8a909e] hover:text-white"
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[#4589ff]" : ""}`} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+
+          <div className="order-2 md:order-3 flex items-center gap-2">
             {/* WABA Connection Status Button */}
             <button
               onClick={() => setIsEmbeddedModalOpen(true)}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition ${
                 tenant.waba_status === "connected"
-                  ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20"
-                  : "bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25"
+                  ? "bg-[#25272c] text-[#e2e8f0] hover:bg-[#2f3238]"
+                  : "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
               }`}
             >
               <span
                 className={`w-2 h-2 rounded-full ${
                   tenant.waba_status === "connected"
-                    ? "bg-emerald-400"
+                    ? "bg-[#4589ff]"
                     : "bg-amber-400 animate-ping"
                 }`}
               />
@@ -444,45 +477,18 @@ export default function DashboardPage() {
 
             <button
               onClick={() => setIsNewEventModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium text-white bg-[#1877f2] hover:bg-[#2e86f8] transition"
             >
               <Plus className="w-4 h-4" />
               New Webinar
             </button>
           </div>
         </div>
-
-        {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto border-t border-slate-900">
-          {[
-            { id: "events", label: "Live Events & Sequence", icon: LayoutDashboard },
-            { id: "templates", label: "Template Studio (Default + Custom)", icon: Sparkles },
-            { id: "whatsapp", label: "Meta Embedded Signup & Webhooks", icon: Smartphone },
-            { id: "billing", label: "M-Pesa Billing & Plans", icon: CreditCard },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition ${
-                  isActive
-                    ? "border-emerald-400 text-emerald-400"
-                    : "border-transparent text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
       </header>
 
-      {/* Toast Notification Banner */}
+      {/* Toast Notification */}
       {bannerNotice && (
-        <div className="bg-emerald-500/15 border-b border-emerald-500/40 px-4 py-2.5 text-center text-xs text-emerald-200 font-medium">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-5 py-3 rounded-full bg-surface-elevated border border-white/[0.1] shadow-glow text-xs text-slate-100 font-medium">
           {bannerNotice}
         </div>
       )}
@@ -493,13 +499,13 @@ export default function DashboardPage() {
         {activeTab === "events" && activeEvent && (
           <div className="space-y-6">
             {/* Top Event Switcher & Actions */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-electric-subtle text-electric-hover border border-electric/30">
                     Active Campaign
                   </span>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-[#94a3b8]">
                     {formatEatDate(activeEvent.starts_at).fullStr}
                   </span>
                 </div>
@@ -508,7 +514,7 @@ export default function DashboardPage() {
                   <select
                     value={activeEvent.id}
                     onChange={(e) => setSelectedEventId(e.target.value)}
-                    className="bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-base sm:text-lg font-bold text-white focus:outline-none focus:border-emerald-500"
+                    className="bg-canvas border border-white/[0.08] rounded-full px-3.5 py-2 text-base sm:text-lg font-bold text-white focus:outline-none focus:border-electric"
                   >
                     {events.map((ev) => (
                       <option key={ev.id} value={ev.id}>
@@ -520,7 +526,7 @@ export default function DashboardPage() {
                   <Link
                     href={`/r/${activeEvent.slug}`}
                     target="_blank"
-                    className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-emerald-400 font-medium transition"
+                    className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-electric-hover font-medium transition"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     Public Registration Page (/r/{activeEvent.slug})
@@ -536,19 +542,19 @@ export default function DashboardPage() {
                       `${originUrl}/r/${activeEvent.slug}`
                     )
                   }
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-slate-200"
                 >
                   {copiedKey === "regUrl" ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <Check className="w-3.5 h-3.5 text-electric-hover" />
                   ) : (
-                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <Copy className="w-3.5 h-3.5 text-[#94a3b8]" />
                   )}
                   Copy Funnel Link
                 </button>
 
                 <button
                   onClick={() => setIsRoiModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-white font-medium text-xs transition"
                 >
                   <TrendingUp className="w-4 h-4" />
                   Generate Post-Webinar ROI Report
@@ -556,31 +562,76 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Event cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {events.map((ev) => {
+                const isActive = ev.id === activeEvent.id;
+                const regs = registrants.filter((r) => r.event_id === ev.id).length;
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => setSelectedEventId(ev.id)}
+                    className={`text-left rounded-3xl p-5 transition-all duration-200 hover:-translate-y-0.5 ${
+                      isActive
+                        ? "bg-surface-elevated shadow-[inset_0_0_0_1px_rgba(69,137,255,0.45)]"
+                        : "bg-surface hover:bg-surface-elevated"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 text-[11px] text-[#8a909e]">
+                      <span className={`w-2 h-2 rounded-full ${isActive ? "bg-[#4589ff]" : "bg-[#64748b]"}`} />
+                      {formatEatDate(ev.starts_at).fullStr}
+                    </div>
+                    <div className="mt-2 text-base font-medium text-[#f8fafc] tracking-tight leading-snug">{ev.title}</div>
+                    <div className="mt-1 text-xs text-[#8a909e]">
+                      Hosted by {ev.host_name} ·{" "}
+                      <span className="font-mono tracking-tight">{regs}</span> registrants
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Metric highlights strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-px rounded-3xl overflow-hidden bg-white/[0.06] border border-white/[0.06]">
+              {[
+                { v: `${liveShowupPct}%`, l: "Live attendance", sub: `${attendedCount} of ${totalRegCount} vs ${baselinePct}% baseline` },
+                { v: `${roiMultiple}x`, l: "ROI vs subscription", sub: "Extra revenue / Ksh 4,999" },
+                { v: formatKesShort(attributedSalesKes), l: "Attributed sales", sub: "From extra attendees" },
+              ].map((m) => (
+                <div key={m.l} className="bg-surface px-8 py-5 text-center sm:text-left">
+                  <div className="font-mono tracking-tight text-4xl font-medium text-[#f8fafc]">{m.v}</div>
+                  <div className="text-xs text-[#94a3b8] mt-1">{m.l}</div>
+                  <div className="text-[11px] text-[#64748b]">{m.sub}</div>
+                </div>
+              ))}
+            </div>
+
             {/* Room Fill Progress Bar (The "Aha! Moment" Widget) */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+            <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Flame className="w-4 h-4 text-emerald-400" />
+                    <Flame className="w-4 h-4 text-electric-hover" />
                     Live Room Fill Rate vs. Historical Email/SMS Baseline
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[#94a3b8]">
                     Tracks real-time clicks on each registrant&apos;s personalized{" "}
-                    <code className="text-emerald-400">/j/[token]</code> WhatsApp join
+                    <code className="text-electric-hover">/j/[token]</code> WhatsApp join
                     button + verified Zoom/Meet CSV uploads.
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-extrabold text-emerald-400">
+                  <span className="text-2xl font-extrabold text-electric-hover">
                     {liveShowupPct}%
                   </span>
-                  <span className="text-xs text-slate-400 ml-1.5">
+                  <span className="text-xs text-[#94a3b8] ml-1.5">
                     ({attendedCount} of {totalRegCount} attended vs {baselinePct}% baseline)
                   </span>
                 </div>
               </div>
 
-              <div className="relative h-4 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+              <div className="relative h-4 w-full bg-canvas rounded-full overflow-hidden border border-white/[0.08]">
                 {/* Baseline marker line */}
                 <div
                   style={{ left: `${Math.min(95, baselinePct)}%` }}
@@ -589,16 +640,16 @@ export default function DashboardPage() {
                 />
                 <div
                   style={{ width: `${Math.min(100, liveShowupPct)}%` }}
-                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-500"
+                  className="h-full bg-electric shadow-glow rounded-full transition-all duration-500"
                 />
               </div>
 
-              <div className="flex justify-between text-[11px] text-slate-400">
+              <div className="flex justify-between text-[11px] text-[#94a3b8]">
                 <span>0%</span>
                 <span className="text-red-400 font-medium">
                   ▲ Past Email/SMS Baseline ({baselinePct}%)
                 </span>
-                <span className="text-emerald-400 font-medium">
+                <span className="text-electric-hover font-medium">
                   Target WhatsApp Show-Up (55%–65%)
                 </span>
                 <span>100%</span>
@@ -606,19 +657,19 @@ export default function DashboardPage() {
             </div>
 
             {/* 5-Stage Automated Sequence Pipeline */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-base font-bold text-white">
                     5-Stage Automated WhatsApp Sequence (Upstash QStash + Meta Cloud API)
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[#94a3b8]">
                     Stage 1 fires on signup; Stages 2–5 fire automatically at their EAT
                     countdown timestamps—or click &ldquo;Fire Stage Now&rdquo; to trigger
                     immediately.
                   </p>
                 </div>
-                <span className="text-xs text-emerald-400 font-mono">
+                <span className="text-xs text-electric-hover font-mono">
                   Timezone: Africa/Nairobi (EAT / UTC+3)
                 </span>
               </div>
@@ -636,27 +687,27 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={st.key}
-                      className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-3"
+                      className="bg-canvas border border-white/[0.08] rounded-xl p-4 flex flex-col justify-between space-y-3"
                     >
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-electric-subtle text-electric-hover border border-electric/30">
                             Stage {st.step}
                           </span>
-                          <span className="text-[11px] text-slate-400">
+                          <span className="text-[11px] text-[#94a3b8]">
                             {sentCount}/{totalRegCount} sent
                           </span>
                         </div>
                         <div className="text-xs font-bold text-white">{st.label}</div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-emerald-400" />
+                        <div className="text-[11px] text-[#94a3b8] flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-electric-hover" />
                           {st.timing}
                         </div>
                         <div className="pt-1">
-                          <span className="text-[10px] text-slate-500 block">
+                          <span className="text-[10px] text-[#64748b] block">
                             Active Template:
                           </span>
-                          <code className="text-[11px] text-emerald-300 break-all">
+                          <code className="text-[11px] text-[#7db4ff] break-all">
                             {assignedTplName}
                           </code>
                         </div>
@@ -665,12 +716,12 @@ export default function DashboardPage() {
                       <button
                         onClick={() => handleFireStageNow(st.key)}
                         disabled={dispatchingStage === st.key}
-                        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-white transition disabled:opacity-50"
+                        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full bg-surface hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-white transition disabled:opacity-50"
                       >
                         {dispatchingStage === st.key ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-electric-hover" />
                         ) : (
-                          <Play className="w-3.5 h-3.5 text-emerald-400" />
+                          <Play className="w-3.5 h-3.5 text-electric-hover" />
                         )}
                         Fire Stage {st.step} Now
                       </button>
@@ -683,27 +734,27 @@ export default function DashboardPage() {
             {/* Lead Ingestion & Instant WhatsApp Test Row */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left: Add Lead / CSV Import / Zoom Reconcile */}
-              <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+              <div className="lg:col-span-7 bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <UserPlus className="w-4 h-4 text-emerald-400" />
+                    <UserPlus className="w-4 h-4 text-electric-hover" />
                     Ingest Webinar Leads (Hosted Page, CSV, or Meta Lead Ads)
                   </h3>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => handleSampleCsvImport("registrants")}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-700 text-[11px] text-slate-200"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-[11px] text-slate-200"
                     >
-                      <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                      <Upload className="w-3.5 h-3.5 text-electric-hover" />
                       Import Sample Leads CSV
                     </button>
                     <button
                       type="button"
                       onClick={() => handleSampleCsvImport("attendance_reconcile")}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-700 text-[11px] text-emerald-300"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-[11px] text-[#7db4ff]"
                     >
-                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-electric-hover" />
                       Reconcile Zoom CSV
                     </button>
                   </div>
@@ -719,7 +770,7 @@ export default function DashboardPage() {
                     placeholder="Lead Full Name (e.g. Jane Wanjiru)"
                     value={quickName}
                     onChange={(e) => setQuickName(e.target.value)}
-                    className="sm:col-span-5 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                    className="sm:col-span-5 px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
                   />
                   <input
                     type="tel"
@@ -727,12 +778,12 @@ export default function DashboardPage() {
                     placeholder="Kenyan Phone (0712 345 678)"
                     value={quickPhone}
                     onChange={(e) => setQuickPhone(e.target.value)}
-                    className="sm:col-span-4 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono"
+                    className="sm:col-span-4 px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white font-mono"
                   />
                   <button
                     type="submit"
                     disabled={addingLead}
-                    className="sm:col-span-3 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition"
+                    className="sm:col-span-3 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full bg-electric hover:bg-electric-hover text-white font-bold text-xs transition"
                   >
                     {addingLead ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -743,10 +794,10 @@ export default function DashboardPage() {
                   </button>
                 </form>
 
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <div className="text-slate-400">
+                <div className="p-3 rounded-xl bg-canvas border border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="text-[#94a3b8]">
                     Universal Lead Webhook (Tally / Typeform / Zapier / Make):
-                    <code className="ml-2 text-emerald-300">
+                    <code className="ml-2 text-[#7db4ff]">
                       POST {originUrl}/api/events/{activeEvent.id}/register
                     </code>
                   </div>
@@ -757,7 +808,7 @@ export default function DashboardPage() {
                         `${originUrl}/api/events/${activeEvent.id}/register`
                       )
                     }
-                    className="text-emerald-400 hover:underline font-medium shrink-0"
+                    className="text-electric-hover hover:underline font-medium shrink-0"
                   >
                     {copiedKey === "whUrl" ? "Copied!" : "Copy URL"}
                   </button>
@@ -765,12 +816,12 @@ export default function DashboardPage() {
               </div>
 
               {/* Right: Live Handset Test Sender */}
-              <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+              <div className="lg:col-span-5 bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-3">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Send className="w-4 h-4 text-emerald-400" />
+                  <Send className="w-4 h-4 text-electric-hover" />
                   Send Instant Test Reminder to Your Phone
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-[#94a3b8]">
                   Use this during client demos: enter their Safaricom/Airtel number and let
                   them watch the template land on their phone in 2 seconds.
                 </p>
@@ -783,12 +834,12 @@ export default function DashboardPage() {
                       placeholder="0712 345 678"
                       value={testPhone}
                       onChange={(e) => setTestPhone(e.target.value)}
-                      className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono"
+                      className="px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white font-mono"
                     />
                     <select
                       value={testTemplate}
                       onChange={(e) => setTestTemplate(e.target.value)}
-                      className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                      className="px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
                     >
                       {templates.map((t) => (
                         <option key={t.id} value={t.name}>
@@ -801,7 +852,7 @@ export default function DashboardPage() {
                   <button
                     type="submit"
                     disabled={sendingTest}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-emerald-500/40 text-emerald-300 font-semibold text-xs transition"
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-canvas hover:bg-white/[0.08] border border-electric/30 text-[#7db4ff] font-semibold text-xs transition"
                   >
                     {sendingTest ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -815,16 +866,16 @@ export default function DashboardPage() {
             </div>
 
             {/* Registrants Table */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="bg-surface border border-white/[0.08] rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-white/[0.08] flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-emerald-400" />
+                  <Users className="w-4 h-4 text-electric-hover" />
                   <h3 className="text-sm font-bold text-white">
                     Webinar Registrants &amp; Live Join Click Tracking ({eventRegistrants.length})
                   </h3>
                 </div>
-                <span className="text-xs text-slate-400">
-                  Click any <code className="text-emerald-400">/j/token</code> link to test
+                <span className="text-xs text-[#94a3b8]">
+                  Click any <code className="text-electric-hover">/j/token</code> link to test
                   attendance tracking
                 </span>
               </div>
@@ -832,7 +883,7 @@ export default function DashboardPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400">
+                    <tr className="border-b border-white/[0.08] bg-canvas/60 text-[#94a3b8]">
                       <th className="py-3 px-4">Registrant</th>
                       <th className="py-3 px-4">WhatsApp (E.164)</th>
                       <th className="py-3 px-4">Source</th>
@@ -840,13 +891,13 @@ export default function DashboardPage() {
                       <th className="py-3 px-4">Attendance Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/70">
+                  <tbody className="divide-y divide-white/[0.06]/70">
                     {eventRegistrants.map((reg) => (
-                      <tr key={reg.id} className="hover:bg-slate-950/40">
+                      <tr key={reg.id} className="hover:bg-canvas/40">
                         <td className="py-3 px-4 font-semibold text-white">
                           {reg.full_name}
                           {reg.email && (
-                            <span className="block text-[11px] text-slate-400 font-normal">
+                            <span className="block text-[11px] text-[#94a3b8] font-normal">
                               {reg.email}
                             </span>
                           )}
@@ -855,7 +906,7 @@ export default function DashboardPage() {
                           {formatPhoneDisplay(reg.phone_e164)}
                         </td>
                         <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-300 text-[11px]">
+                          <span className="px-2 py-0.5 rounded-full bg-canvas border border-white/[0.08] text-[#94a3b8] text-[11px]">
                             {reg.source}
                           </span>
                         </td>
@@ -865,7 +916,7 @@ export default function DashboardPage() {
                             target="_blank"
                             rel="noreferrer"
                             onClick={() => setTimeout(loadWorkspace, 1000)}
-                            className="inline-flex items-center gap-1 font-mono text-emerald-400 hover:underline"
+                            className="inline-flex items-center gap-1 font-mono text-electric-hover hover:underline"
                           >
                             /j/{reg.tracking_token}
                             <ExternalLink className="w-3 h-3" />
@@ -873,7 +924,7 @@ export default function DashboardPage() {
                         </td>
                         <td className="py-3 px-4">
                           {reg.clicked_join_link || reg.zoom_verified ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-[11px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-electric-subtle border border-electric/30 text-[#7db4ff] font-semibold text-[11px]">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               Attended Live
                               {reg.zoom_duration_minutes
@@ -881,7 +932,7 @@ export default function DashboardPage() {
                                 : ""}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950 border border-slate-800 text-slate-400 text-[11px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-canvas border border-white/[0.08] text-[#94a3b8] text-[11px]">
                               Awaiting Live Join
                             </span>
                           )}
@@ -900,19 +951,19 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left: Existing Default + Custom Templates */}
             <div className="lg:col-span-7 space-y-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between">
+              <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-bold text-white">
                     WABA Message Templates ({templates.length})
                   </h2>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[#94a3b8]">
                     Includes the 5 pre-approved ShowUp default templates + any custom
                     templates submitted for your events.
                   </p>
                 </div>
                 <button
                   onClick={loadWorkspace}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-emerald-400"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-electric-hover"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Sync from Meta WABA
@@ -923,18 +974,18 @@ export default function DashboardPage() {
                 {templates.map((tpl) => (
                   <div
                     key={tpl.id}
-                    className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2.5"
+                    className="bg-surface border border-white/[0.08] rounded-2xl p-4 space-y-2.5"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <code className="text-xs font-bold text-emerald-400">
+                        <code className="text-xs font-bold text-electric-hover">
                           {tpl.name}
                         </code>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-300 font-mono">
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-canvas border border-white/[0.08] text-[#94a3b8] font-mono">
                           {tpl.category}
                         </span>
                         {tpl.is_system_default && (
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-electric-subtle text-[#7db4ff] border border-electric/30">
                             Standard Pre-Approved
                           </span>
                         )}
@@ -942,7 +993,7 @@ export default function DashboardPage() {
                       <span
                         className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
                           tpl.status === "APPROVED"
-                            ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                            ? "bg-electric-subtle text-[#7db4ff] border border-electric/30"
                             : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                         }`}
                       >
@@ -950,7 +1001,7 @@ export default function DashboardPage() {
                       </span>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-[#0b141a] border border-emerald-950/60 text-xs text-slate-200 whitespace-pre-wrap font-sans">
+                    <div className="p-3 rounded-xl bg-[#0b141a] border border-electric/30 text-xs text-slate-200 whitespace-pre-wrap font-sans">
                       {tpl.body_text}
                     </div>
                   </div>
@@ -960,20 +1011,20 @@ export default function DashboardPage() {
 
             {/* Right: Create Custom Template Builder */}
             <div className="lg:col-span-5">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 sticky top-32">
+              <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-4 sticky top-32">
                 <div>
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                    <Sparkles className="w-4 h-4 text-electric-hover" />
                     Create Custom Event Template
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Write custom copy with dynamic variables (<code className="text-emerald-300">&#123;&#123;1&#125;&#125;</code> = First Name, <code className="text-emerald-300">&#123;&#123;2&#125;&#125;</code> = Event Title, <code className="text-emerald-300">&#123;&#123;3&#125;&#125;</code> = Time/Link).
+                  <p className="text-xs text-[#94a3b8]">
+                    Write custom copy with dynamic variables (<code className="text-[#7db4ff]">&#123;&#123;1&#125;&#125;</code> = First Name, <code className="text-[#7db4ff]">&#123;&#123;2&#125;&#125;</code> = Event Title, <code className="text-[#7db4ff]">&#123;&#123;3&#125;&#125;</code> = Time/Link).
                   </p>
                 </div>
 
                 <form onSubmit={handleCreateCustomTemplate} className="space-y-3.5">
                   <div>
-                    <label className="block text-xs text-slate-300 mb-1">
+                    <label className="block text-xs text-[#94a3b8] mb-1">
                       Template Name (snake_case)
                     </label>
                     <input
@@ -982,13 +1033,13 @@ export default function DashboardPage() {
                       placeholder="e.g. forex_vip_countdown_1h"
                       value={customTplName}
                       onChange={(e) => setCustomTplName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono"
+                      className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white font-mono"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-slate-300 mb-1">
+                      <label className="block text-xs text-[#94a3b8] mb-1">
                         Meta Category
                       </label>
                       <select
@@ -998,14 +1049,14 @@ export default function DashboardPage() {
                             e.target.value as "UTILITY" | "MARKETING"
                           )
                         }
-                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                        className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
                       >
                         <option value="UTILITY">UTILITY (Lower Fee)</option>
                         <option value="MARKETING">MARKETING (Promotional)</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-300 mb-1">
+                      <label className="block text-xs text-[#94a3b8] mb-1">
                         Target Stage
                       </label>
                       <select
@@ -1015,7 +1066,7 @@ export default function DashboardPage() {
                             e.target.value as SequenceStage | "custom"
                           )
                         }
-                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                        className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
                       >
                         <option value="instant_welcome">Stage 1: Instant Welcome</option>
                         <option value="calendar_link">Stage 2: Calendar Link</option>
@@ -1027,7 +1078,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-slate-300 mb-1">
+                    <label className="block text-xs text-[#94a3b8] mb-1">
                       Message Body
                     </label>
                     <textarea
@@ -1035,13 +1086,13 @@ export default function DashboardPage() {
                       required
                       value={customTplBody}
                       onChange={(e) => setCustomTplBody(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
                     />
                   </div>
 
                   {/* Live Handset Bubble Preview */}
-                  <div className="p-3.5 rounded-xl bg-[#0b141a] border border-emerald-950/60 space-y-1">
-                    <div className="text-[10px] text-emerald-400 uppercase font-bold">
+                  <div className="p-3.5 rounded-xl bg-[#0b141a] border border-electric/30 space-y-1">
+                    <div className="text-[10px] text-electric-hover uppercase font-bold">
                       Live WhatsApp Handset Preview
                     </div>
                     <div className="text-xs text-slate-200 whitespace-pre-wrap">
@@ -1058,7 +1109,7 @@ export default function DashboardPage() {
                   <button
                     type="submit"
                     disabled={creatingTemplate}
-                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition"
+                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-electric hover:bg-electric-hover text-white font-bold text-xs transition"
                   >
                     {creatingTemplate ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1078,38 +1129,38 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Left: Embedded Signup Card */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <div className="bg-surface border border-white/[0.08] rounded-2xl p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Smartphone className="w-5 h-5 text-emerald-400" />
+                    <Smartphone className="w-5 h-5 text-electric-hover" />
                     Meta Embedded Signup Status
                   </h3>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-electric-subtle text-[#7db4ff] border border-electric/30 font-mono">
                     Config ID: {metaConfigId}
                   </span>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                <div className="p-4 rounded-xl bg-canvas border border-white/[0.08] space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Connection State:</span>
-                    <span className="font-bold text-emerald-400 uppercase">
+                    <span className="text-[#94a3b8]">Connection State:</span>
+                    <span className="font-bold text-electric-hover uppercase">
                       {tenant.waba_status}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Client WABA ID:</span>
+                    <span className="text-[#94a3b8]">Client WABA ID:</span>
                     <code className="text-slate-200">
                       {tenant.waba_id || "Not connected yet"}
                     </code>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Phone Number ID:</span>
+                    <span className="text-[#94a3b8]">Phone Number ID:</span>
                     <code className="text-slate-200">
                       {tenant.phone_number_id || "Not connected yet"}
                     </code>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Display Phone:</span>
+                    <span className="text-[#94a3b8]">Display Phone:</span>
                     <span className="text-slate-200 font-semibold">
                       {tenant.display_phone_number || "—"}
                     </span>
@@ -1118,7 +1169,7 @@ export default function DashboardPage() {
 
                 <button
                   onClick={() => setIsEmbeddedModalOpen(true)}
-                  className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition"
+                  className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-electric hover:bg-electric-hover text-white font-bold text-xs transition"
                 >
                   <Smartphone className="w-4 h-4" />
                   Open Meta Embedded Signup Modal
@@ -1126,56 +1177,56 @@ export default function DashboardPage() {
               </div>
 
               {/* Right: Webhook & Database Status */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <div className="bg-surface border border-white/[0.08] rounded-2xl p-6 space-y-4">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Database className="w-5 h-5 text-emerald-400" />
+                  <Database className="w-5 h-5 text-electric-hover" />
                   Meta Webhook &amp; Supabase Database Status
                 </h3>
 
                 <div className="space-y-3 text-xs">
-                  <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <div className="text-slate-400">
+                  <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] space-y-1">
+                    <div className="text-[#94a3b8]">
                       Meta Webhook Callback URL (Paste in Meta Portal → WhatsApp →
                       Configuration):
                     </div>
                     <div className="flex items-center justify-between gap-2 pt-1">
-                      <code className="text-emerald-300 break-all">
+                      <code className="text-[#7db4ff] break-all">
                         {originUrl}/api/webhooks/meta
                       </code>
                       <button
                         onClick={() =>
                           copyText("metaWh", `${originUrl}/api/webhooks/meta`)
                         }
-                        className="text-emerald-400 underline shrink-0"
+                        className="text-electric-hover underline shrink-0"
                       >
                         {copiedKey === "metaWh" ? "Copied" : "Copy"}
                       </button>
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <div className="text-slate-400">Meta Webhook Verify Token:</div>
+                  <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] space-y-1">
+                    <div className="text-[#94a3b8]">Meta Webhook Verify Token:</div>
                     <div className="flex items-center justify-between gap-2 pt-1">
-                      <code className="text-emerald-300">
+                      <code className="text-[#7db4ff]">
                         showup_secret_verify_token_2026
                       </code>
                       <button
                         onClick={() =>
                           copyText("verifyTok", "showup_secret_verify_token_2026")
                         }
-                        className="text-emerald-400 underline shrink-0"
+                        className="text-electric-hover underline shrink-0"
                       >
                         {copiedKey === "verifyTok" ? "Copied" : "Copy"}
                       </button>
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] flex items-center justify-between">
                     <div>
                       <div className="text-white font-semibold">
                         Supabase Storage Engine
                       </div>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] text-[#94a3b8]">
                         {supabaseReady
                           ? "Connected to live `showup_*` tables in Supabase"
                           : "Running on resilient local persistence (Run migration SQL in Supabase SQL Editor to sync cloud tables)"}
@@ -1184,7 +1235,7 @@ export default function DashboardPage() {
                     <span
                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
                         supabaseReady
-                          ? "bg-emerald-500/15 text-emerald-300"
+                          ? "bg-electric-subtle text-[#7db4ff]"
                           : "bg-amber-500/15 text-amber-300"
                       }`}
                     >
@@ -1200,55 +1251,55 @@ export default function DashboardPage() {
         {/* TAB 4: M-PESA BILLING & SUBSCRIPTION UPGRADE */}
         {activeTab === "billing" && (
           <div className="space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <div className="bg-surface border border-white/[0.08] rounded-2xl p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-bold text-white">
                     M-Pesa STK Push Subscription Billing
                   </h2>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[#94a3b8]">
                     Clients pay Meta directly for their tiny Utility conversation fees, and
                     pay your monthly SaaS subscription via M-Pesa STK Push.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-slate-400">M-Pesa Number:</label>
+                  <label className="text-xs text-[#94a3b8]">M-Pesa Number:</label>
                   <input
                     type="tel"
                     value={mpesaPhone}
                     onChange={(e) => setMpesaPhone(e.target.value)}
                     placeholder="0712 345 678"
-                    className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono"
+                    className="px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
-                <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-canvas border border-white/[0.08] flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="text-xs font-bold text-slate-400 uppercase">
+                    <div className="text-xs font-bold text-[#94a3b8] uppercase">
                       Free Pilot Tier
                     </div>
                     <div className="text-2xl font-extrabold text-white">Ksh 0</div>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-[#94a3b8]">
                       Up to 100 registrants on your first live webinar to prove the
                       attendance jump.
                     </p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-emerald-400 font-semibold">
+                  <div className="mt-4 pt-3 border-t border-white/[0.08] text-xs text-electric-hover font-semibold">
                     {tenant.plan_tier === "pilot" ? "✓ Current Plan" : "Included"}
                   </div>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-slate-950 border-2 border-emerald-500 flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-canvas border-2 border-electric flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="text-xs font-bold text-emerald-400 uppercase">
+                    <div className="text-xs font-bold text-electric-hover uppercase">
                       Starter Tier
                     </div>
                     <div className="text-2xl font-extrabold text-white">
-                      Ksh 4,999 <span className="text-xs font-normal text-slate-400">/mo</span>
+                      Ksh 4,999 <span className="text-xs font-normal text-[#94a3b8]">/mo</span>
                     </div>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-[#94a3b8]">
                       Up to 500 registrants/month, unlimited webinars, Template Studio, and
                       ROI reports.
                     </p>
@@ -1256,7 +1307,7 @@ export default function DashboardPage() {
                   <button
                     onClick={() => handleMpesaUpgrade("starter")}
                     disabled={processingMpesa !== null}
-                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition"
+                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-electric hover:bg-electric-hover text-white font-bold text-xs transition"
                   >
                     {processingMpesa === "starter" ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1269,15 +1320,15 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-canvas border border-white/[0.08] flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="text-xs font-bold text-slate-300 uppercase">
+                    <div className="text-xs font-bold text-[#94a3b8] uppercase">
                       Pro Scale Tier
                     </div>
                     <div className="text-2xl font-extrabold text-white">
-                      Ksh 9,999 <span className="text-xs font-normal text-slate-400">/mo</span>
+                      Ksh 9,999 <span className="text-xs font-normal text-[#94a3b8]">/mo</span>
                     </div>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-[#94a3b8]">
                       Up to 2,000 registrants/month for high-volume academies and training
                       companies.
                     </p>
@@ -1285,7 +1336,7 @@ export default function DashboardPage() {
                   <button
                     onClick={() => handleMpesaUpgrade("pro")}
                     disabled={processingMpesa !== null}
-                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-300 font-bold text-xs transition"
+                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-electric/30 hover:bg-electric/20 text-[#7db4ff] font-bold text-xs transition"
                   >
                     {processingMpesa === "pro" ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1299,21 +1350,21 @@ export default function DashboardPage() {
             </div>
 
             {payments.length > 0 && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+              <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-3">
                 <h3 className="text-sm font-bold text-white">M-Pesa Receipt History</h3>
                 <div className="space-y-2">
                   {payments.map((p) => (
                     <div
                       key={p.id}
-                      className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs"
+                      className="p-3 rounded-xl bg-canvas border border-white/[0.08] flex items-center justify-between text-xs"
                     >
                       <div>
                         <span className="font-bold text-white uppercase">
                           {p.plan_tier} Plan
                         </span>{" "}
-                        • <span className="text-emerald-400 font-mono">{p.mpesa_receipt}</span>
+                        • <span className="text-electric-hover font-mono">{p.mpesa_receipt}</span>
                       </div>
-                      <div className="text-slate-300">
+                      <div className="text-[#94a3b8]">
                         Ksh {p.amount_kes.toLocaleString()} (+{p.phone_e164})
                       </div>
                     </div>
@@ -1355,14 +1406,14 @@ export default function DashboardPage() {
       {/* MODAL 3: CREATE NEW WEBINAR */}
       {isNewEventModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="bg-surface border border-white/[0.08] rounded-2xl max-w-2xl w-full p-6 space-y-5 my-8">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <h3 className="text-lg font-bold text-white">
                 Create New Webinar &amp; Configure 5-Stage Sequence
               </h3>
               <button
                 onClick={() => setIsNewEventModalOpen(false)}
-                className="text-slate-400 hover:text-white text-sm"
+                className="text-[#94a3b8] hover:text-white text-sm"
               >
                 ✕
               </button>
@@ -1371,31 +1422,31 @@ export default function DashboardPage() {
             <form onSubmit={handleCreateEvent} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 mb-1">Webinar Title *</label>
+                  <label className="block text-[#94a3b8] mb-1">Webinar Title *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Forex & Gold Trading Masterclass"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 mb-1">Host / Trainer Name *</label>
+                  <label className="block text-[#94a3b8] mb-1">Host / Trainer Name *</label>
                   <input
                     type="text"
                     required
                     value={newHostName}
                     onChange={(e) => setNewHostName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 mb-1">
+                  <label className="block text-[#94a3b8] mb-1">
                     Start Date &amp; Time (EAT) *
                   </label>
                   <input
@@ -1403,11 +1454,11 @@ export default function DashboardPage() {
                     required
                     value={newStartsAt}
                     onChange={(e) => setNewStartsAt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 mb-1">
+                  <label className="block text-[#94a3b8] mb-1">
                     Zoom / Google Meet / YouTube Live URL *
                   </label>
                   <input
@@ -1415,13 +1466,13 @@ export default function DashboardPage() {
                     required
                     value={newJoinUrl}
                     onChange={(e) => setNewJoinUrl(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1">
+                <label className="block text-[#94a3b8] mb-1">
                   T-24h Value Hook (Sent 24 hours before start: &ldquo;In this session, Host
                   will show you...&rdquo;)
                 </label>
@@ -1430,19 +1481,19 @@ export default function DashboardPage() {
                   required
                   value={newTeaserHook}
                   onChange={(e) => setNewTeaserHook(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
                 />
               </div>
 
               {/* Template Assignment per Stage */}
-              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
-                <div className="font-semibold text-emerald-400">
+              <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] space-y-2.5">
+                <div className="font-semibold text-electric-hover">
                   Assign Templates for Each Stage (Default Pre-Approved or Custom):
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {STAGES_META.map((st) => (
                     <div key={st.key}>
-                      <label className="block text-[11px] text-slate-400 mb-0.5">
+                      <label className="block text-[11px] text-[#94a3b8] mb-0.5">
                         Stage {st.step}: {st.label}
                       </label>
                       <select
@@ -1453,7 +1504,7 @@ export default function DashboardPage() {
                             [st.key]: e.target.value,
                           }))
                         }
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white"
+                        className="w-full px-2.5 py-1.5 rounded-full bg-surface border border-white/[0.08] text-white"
                       >
                         {templates.map((t) => (
                           <option key={t.id} value={t.name}>
@@ -1468,30 +1519,30 @@ export default function DashboardPage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">Ad Spend (Ksh)</label>
+                  <label className="block text-[#94a3b8] mb-1">Ad Spend (Ksh)</label>
                   <input
                     type="number"
                     value={newAdSpend}
                     onChange={(e) => setNewAdSpend(Number(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Past Baseline %</label>
+                  <label className="block text-[#94a3b8] mb-1">Past Baseline %</label>
                   <input
                     type="number"
                     value={newBaselinePct}
                     onChange={(e) => setNewBaselinePct(Number(e.target.value) || 20)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Offer Price (Ksh)</label>
+                  <label className="block text-[#94a3b8] mb-1">Offer Price (Ksh)</label>
                   <input
                     type="number"
                     value={newOfferPrice}
                     onChange={(e) => setNewOfferPrice(Number(e.target.value) || 25000)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
                   />
                 </div>
               </div>
@@ -1500,14 +1551,14 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsNewEventModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                  className="px-4 py-2 rounded-full border border-white/[0.08] text-[#94a3b8]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creatingEvent}
-                  className="px-6 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold"
+                  className="px-6 py-2 rounded-full bg-electric hover:bg-electric-hover text-white font-bold"
                 >
                   {creatingEvent ? "Creating..." : "Create Webinar & Generate Funnel"}
                 </button>

@@ -368,38 +368,38 @@ export function EmbeddedSignupModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl my-6">
+      <div className="bg-surface border border-white/[0.08] rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl my-6">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/60">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-canvas/60">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="w-10 h-10 rounded-xl bg-electric-subtle border border-electric/30 flex items-center justify-center text-electric-hover">
               <Smartphone className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white">
                 Connect Official WhatsApp Business API
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#94a3b8]">
                 Meta Tech Provider Embedded Signup • Zero Ban Risk • Auto-Template Provisioning
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800"
+            className="text-[#94a3b8] hover:text-white p-1.5 rounded-lg hover:bg-white/[0.08]"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Mode Switcher */}
-        <div className="px-6 pt-4 flex gap-2 border-b border-slate-800">
+        <div className="px-6 pt-4 flex gap-2 border-b border-white/[0.08]">
           <button
             onClick={() => setActiveTab("embedded")}
             className={`pb-3 px-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
               activeTab === "embedded"
-                ? "border-emerald-500 text-emerald-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                ? "border-electric text-electric-hover"
+                : "border-transparent text-[#94a3b8] hover:text-slate-200"
             }`}
           >
             <Sparkles className="w-4 h-4" />
@@ -409,8 +409,8 @@ export function EmbeddedSignupModal({
             onClick={() => setActiveTab("direct")}
             className={`pb-3 px-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
               activeTab === "direct"
-                ? "border-emerald-500 text-emerald-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                ? "border-electric text-electric-hover"
+                : "border-transparent text-[#94a3b8] hover:text-slate-200"
             }`}
           >
             <KeyRound className="w-4 h-4" />
@@ -426,7 +426,7 @@ export function EmbeddedSignupModal({
           )}
 
           {statusMessage && (
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+            <div className="p-3.5 rounded-xl bg-electric-subtle border border-electric/30 text-[#7db4ff] text-xs flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>{statusMessage}</span>
             </div>
@@ -434,48 +434,48 @@ export function EmbeddedSignupModal({
 
           {activeTab === "embedded" ? (
             <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+              <div className="p-4 rounded-xl bg-canvas border border-white/[0.08] space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-electric-hover">
                     Your Live Meta Embedded Signup Config
                   </span>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-electric-subtle text-[#7db4ff] border border-electric/30">
                     Tech Provider Verified
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">
+                    <label className="block text-xs text-[#94a3b8] mb-1">
                       Configuration ID
                     </label>
                     <input
                       type="text"
                       value={configId}
                       onChange={(e) => setConfigId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-2 rounded-full bg-surface border border-white/[0.08] text-white text-sm font-mono focus:outline-none focus:border-electric"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">
+                    <label className="block text-xs text-[#94a3b8] mb-1">
                       Meta App ID
                     </label>
                     <input
                       type="text"
                       value={appId}
                       onChange={(e) => setAppId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-2 rounded-full bg-surface border border-white/[0.08] text-white text-sm font-mono focus:outline-none focus:border-electric"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                  <span>Origin: <code className="text-emerald-300">{typeof window !== "undefined" ? window.location.origin : ""}</code></span>
+                <div className="flex items-center justify-between text-[11px] text-[#94a3b8] pt-1">
+                  <span>Origin: <code className="text-[#7db4ff]">{typeof window !== "undefined" ? window.location.origin : ""}</code></span>
                   <a
                     href={directMetaHostedUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
+                    className="text-electric-hover hover:underline flex items-center gap-1 font-semibold"
                   >
                     Open Meta-Hosted Onboarding URL
                     <ExternalLink className="w-3 h-3" />
@@ -484,23 +484,23 @@ export function EmbeddedSignupModal({
               </div>
 
               {/* In-App Live Debug Console */}
-              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span className="flex items-center gap-1.5 font-mono text-[11px] text-slate-300">
-                    <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+              <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] space-y-2">
+                <div className="flex items-center justify-between text-xs text-[#94a3b8]">
+                  <span className="flex items-center gap-1.5 font-mono text-[11px] text-[#94a3b8]">
+                    <Terminal className="w-3.5 h-3.5 text-electric-hover" />
                     Live Debug Event Stream (Check F12 Console for full logs)
                   </span>
                   <button
                     type="button"
                     onClick={() => setLogs([])}
-                    className="text-[10px] text-slate-500 hover:text-slate-300"
+                    className="text-[10px] text-[#64748b] hover:text-[#94a3b8]"
                   >
                     Clear Logs
                   </button>
                 </div>
-                <div className="h-28 overflow-y-auto font-mono text-[11px] text-slate-300 bg-black/60 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
+                <div className="h-28 overflow-y-auto font-mono text-[11px] text-[#94a3b8] bg-black/60 p-2.5 rounded-lg border border-white/[0.07] space-y-1">
                   {logs.length === 0 ? (
-                    <span className="text-slate-600">Waiting for actions... click &quot;Launch Meta Embedded Signup&quot; to begin.</span>
+                    <span className="text-[#64748b]">Waiting for actions... click &quot;Launch Meta Embedded Signup&quot; to begin.</span>
                   ) : (
                     logs.map((log, i) => (
                       <div key={i} className="leading-tight break-all">
@@ -516,7 +516,7 @@ export function EmbeddedSignupModal({
                   type="button"
                   onClick={() => handleDirectTokenConnect(true)}
                   disabled={loading}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-xs font-medium text-slate-300 transition"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-full border border-white/[0.08] hover:bg-white/[0.08] text-xs font-medium text-[#94a3b8] transition"
                 >
                   Activate Sandbox Demo WABA
                 </button>
@@ -526,7 +526,7 @@ export function EmbeddedSignupModal({
                     href={directMetaHostedUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 text-xs font-semibold transition"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full border border-electric/30 text-[#7db4ff] hover:bg-electric/20 text-xs font-semibold transition"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     Open Meta Hosted Page
@@ -536,7 +536,7 @@ export function EmbeddedSignupModal({
                     type="button"
                     onClick={launchEmbeddedSignupPopup}
                     disabled={loading}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm text-white bg-electric hover:bg-electric-hover transition shadow-lg shadow-[#0064e0]/20 disabled:opacity-50"
                   >
                     {loading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -550,13 +550,13 @@ export function EmbeddedSignupModal({
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#94a3b8]">
                 Use this tab to connect via a direct System User Token (for Concierge Pilots #1–5).
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">
+                  <label className="block text-xs text-[#94a3b8] mb-1">
                     WhatsApp Business Account ID (WABA ID)
                   </label>
                   <input
@@ -564,11 +564,11 @@ export function EmbeddedSignupModal({
                     placeholder="e.g. 104928172635412"
                     value={manualWabaId}
                     onChange={(e) => setManualWabaId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-sm font-mono"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white text-sm font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">
+                  <label className="block text-xs text-[#94a3b8] mb-1">
                     Phone Number ID
                   </label>
                   <input
@@ -576,14 +576,14 @@ export function EmbeddedSignupModal({
                     placeholder="e.g. 109827364519283"
                     value={manualPhoneId}
                     onChange={(e) => setManualPhoneId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-sm font-mono"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white text-sm font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">
+                  <label className="block text-xs text-[#94a3b8] mb-1">
                     Display Phone Number
                   </label>
                   <input
@@ -591,11 +591,11 @@ export function EmbeddedSignupModal({
                     placeholder="+254 712 345 678"
                     value={manualDisplayPhone}
                     onChange={(e) => setManualDisplayPhone(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-sm"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">
+                  <label className="block text-xs text-[#94a3b8] mb-1">
                     System User Permanent Access Token
                   </label>
                   <input
@@ -603,7 +603,7 @@ export function EmbeddedSignupModal({
                     placeholder="EAAG..."
                     value={manualToken}
                     onChange={(e) => setManualToken(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-sm font-mono"
+                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white text-sm font-mono"
                   />
                 </div>
               </div>
@@ -613,7 +613,7 @@ export function EmbeddedSignupModal({
                   type="button"
                   onClick={() => handleDirectTokenConnect(true)}
                   disabled={loading}
-                  className="px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-xs font-medium text-slate-300"
+                  className="px-4 py-2.5 rounded-full border border-white/[0.08] hover:bg-white/[0.08] text-xs font-medium text-[#94a3b8]"
                 >
                   Use Sandbox Demo Credentials
                 </button>
@@ -622,7 +622,7 @@ export function EmbeddedSignupModal({
                   type="button"
                   onClick={() => handleDirectTokenConnect(false)}
                   disabled={loading}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm text-white bg-electric hover:bg-electric-hover transition"
                 >
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
