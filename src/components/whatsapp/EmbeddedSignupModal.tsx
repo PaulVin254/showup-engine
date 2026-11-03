@@ -162,7 +162,7 @@ export function EmbeddedSignupModal({
       }
 
       window.FB.login(
-        async (response) => {
+        function (response) {
           if (response?.authResponse?.code) {
             const code = response.authResponse.code;
             const wabaId =
@@ -174,29 +174,31 @@ export function EmbeddedSignupModal({
               "Exchanging authorization code & provisioning 5 Webinar Templates..."
             );
 
-            try {
-              const res = await fetch("/api/whatsapp/embedded-signup/callback", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  code,
-                  wabaId,
-                  phoneNumberId,
-                }),
+            fetch("/api/whatsapp/embedded-signup/callback", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                code,
+                wabaId,
+                phoneNumberId,
+              }),
+            })
+              .then(async (res) => {
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                  throw new Error(data.error || "Failed onboarding WABA");
+                }
+                onConnected(data.tenant);
+                onClose();
+              })
+              .catch((err: unknown) => {
+                setError(
+                  err instanceof Error ? err.message : "Failed completing callback"
+                );
+              })
+              .finally(() => {
+                setLoading(false);
               });
-              const data = await res.json();
-              if (!res.ok) {
-                throw new Error(data.error || "Failed onboarding WABA");
-              }
-              onConnected(data.tenant);
-              onClose();
-            } catch (err: unknown) {
-              setError(
-                err instanceof Error ? err.message : "Failed completing callback"
-              );
-            } finally {
-              setLoading(false);
-            }
           } else {
             setLoading(false);
             setStatusMessage("Popup closed before authorization completed.");
