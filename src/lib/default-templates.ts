@@ -37,7 +37,7 @@ export const DEFAULT_WEBINAR_TEMPLATES: DefaultTemplateBlueprint[] = [
     category: "UTILITY",
     language: "en",
     body_text:
-      "{{1}}, lock {{2}} into your phone calendar now so nothing gets in the way:\n\n📅 {{3}}\n\nWe go live on {{4}} at {{5}} (EAT).",
+      "Hi {{1}}, lock {{2}} into your phone calendar now so nothing gets in the way:\n\n📅 {{3}}\n\nWe go live on {{4}} at {{5}} (EAT). See you inside!",
     button_type: "NONE",
     variables_schema: [
       "Registrant First Name",
@@ -49,7 +49,7 @@ export const DEFAULT_WEBINAR_TEMPLATES: DefaultTemplateBlueprint[] = [
     example_values: [
       "Wanjiku",
       "Nairobi Real Estate & Wealth Masterclass",
-      "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Masterclass",
+      "https://calendar.google.com/calendar",
       "Saturday, 14 Nov",
       "7:00 PM",
     ],
@@ -101,10 +101,8 @@ export const DEFAULT_WEBINAR_TEMPLATES: DefaultTemplateBlueprint[] = [
     category: "UTILITY",
     language: "en",
     body_text:
-      "{{1}}, WE ARE LIVE NOW 🔴\n\n{{2}} has just opened the room.\n\nTap your personal access link below to join immediately:\n👉 {{3}}",
-    button_type: "URL",
-    button_text: "Join Live Room Now",
-    button_url_pattern: "{{1}}",
+      "Hi {{1}}, WE ARE LIVE NOW 🔴\n\n{{2}} has just opened the room.\n\nTap your personal access link below to join immediately:\n👉 {{3}}\n\nSee you inside the room!",
+    button_type: "NONE",
     variables_schema: ["Registrant First Name", "Event Title", "Tracked Join Link (/j/token)"],
     example_values: [
       "Wanjiku",
