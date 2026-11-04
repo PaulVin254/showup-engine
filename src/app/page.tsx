@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Script from "next/script";
 import {
   ArrowRight,
   Check,
@@ -9,6 +10,7 @@ import {
   Clock,
   ExternalLink,
   Loader2,
+  Lock,
   Send,
   ShieldCheck,
   Smartphone,
@@ -40,12 +42,42 @@ export default function LandingPage() {
   );
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const [ahaResult, setAhaResult] = useState<{
     toPhoneE164: string;
     previewText: string;
     senderLabel: string;
     simulated?: boolean;
+    capped?: boolean;
+    message?: string;
   } | null>(null);
+
+  // Initialize invisible Turnstile bot protection if site key is configured
+  useEffect(() => {
+    const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    if (typeof window === "undefined" || !siteKey || !turnstileContainerRef.current) return;
+
+    const interval = setInterval(() => {
+      const w = window as unknown as {
+        turnstile?: {
+          render: (
+            container: HTMLElement,
+            params: { sitekey: string; callback: (token: string) => void }
+          ) => void;
+        };
+      };
+      if (w.turnstile && turnstileContainerRef.current) {
+        clearInterval(interval);
+        w.turnstile.render(turnstileContainerRef.current, {
+          sitekey: siteKey,
+          callback: (token: string) => setTurnstileToken(token),
+        });
+      }
+    }, 300);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSendTestReminder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +94,7 @@ export default function LandingPage() {
           eventTitle:
             testEventTitle.trim() || "Free Real Estate Masterclass",
           templateName: "event_registration_confirmed",
+          turnstileToken,
         }),
       });
       const data = await res.json();
@@ -75,8 +108,10 @@ export default function LandingPage() {
           data.previewText ||
           `Hi Wanjiku 👋 You're confirmed for *${testEventTitle}*, Sat 7:00 PM. I'll remind you before we start. Reply 1 to confirm you're coming.`,
         senderLabel:
-          data.senderLabel || "ShowUp Verified Number (+254 712 345 678)",
+          data.senderLabel || "ShowUp Verified Number (+254 727 838624)",
         simulated: data.simulated,
+        capped: data.capped,
+        message: data.message,
       });
     } catch (err: unknown) {
       setError(
@@ -161,8 +196,9 @@ export default function LandingPage() {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 Try it in 10 seconds — no signup required
               </div>
-              <span className="text-[11px] font-mono text-[#8a909e]">
-                Shared ShowUp Sandbox
+              <span className="text-[11px] font-mono text-[#8a909e] flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                Anti-Spam Protected
               </span>
             </div>
 
@@ -214,7 +250,15 @@ export default function LandingPage() {
                   )}
                 </button>
               </div>
+
+              {/* Invisible Cloudflare Turnstile Hook */}
+              <div ref={turnstileContainerRef} className="hidden" />
             </form>
+
+            <div className="mt-2.5 flex items-center justify-between text-[11px] text-[#8a909e] px-1">
+              <span>Capped to 1 live reminder per number every 24 hours.</span>
+              <span className="hidden sm:inline">Official Meta Cloud API</span>
+            </div>
 
             {error && (
               <div className="mt-3 px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs text-red-300">
@@ -228,10 +272,7 @@ export default function LandingPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="inline-flex items-center gap-2 text-xs font-medium text-emerald-400">
                     <CheckCircle2 className="w-4 h-4" />
-                    Dispatched to +{ahaResult.toPhoneE164} from{" "}
-                    <span className="text-white font-mono">
-                      {ahaResult.senderLabel}
-                    </span>
+                    {ahaResult.message || `Dispatched to +${ahaResult.toPhoneE164} from ${ahaResult.senderLabel}`}
                   </div>
                   <span className="text-[11px] text-[#8a909e]">
                     Stage 1 of 5 • Instant confirmation
@@ -462,6 +503,14 @@ export default function LandingPage() {
       <footer className="py-12 border-t border-white/[0.06] text-center text-xs text-[#7c828e]">
         ShowUp · Built for Kenya &amp; Africa · Official Meta WhatsApp Cloud API
       </footer>
+
+      {/* Cloudflare Turnstile Script */}
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+        async
+        defer
+        strategy="afterInteractive"
+      />
     </div>
   );
 }
