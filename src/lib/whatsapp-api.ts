@@ -9,7 +9,8 @@ export interface SendTemplateMessageInput {
   toPhoneE164: string;
   templateName: string;
   languageCode?: string;
-  bodyVariables: string[];
+  bodyVariables?: string[];
+  namedVariables?: Record<string, string>;
   buttonUrlSuffix?: string;
 }
 
@@ -272,7 +273,16 @@ export async function sendWhatsAppTemplateMessage(
 
   const components: Array<Record<string, unknown>> = [];
 
-  if (input.bodyVariables.length > 0) {
+  if (input.namedVariables && Object.keys(input.namedVariables).length > 0) {
+    components.push({
+      type: "body",
+      parameters: Object.entries(input.namedVariables).map(([paramName, val]) => ({
+        type: "text",
+        parameter_name: paramName,
+        text: String(val),
+      })),
+    });
+  } else if (input.bodyVariables && input.bodyVariables.length > 0) {
     components.push({
       type: "body",
       parameters: input.bodyVariables.map((val) => ({
