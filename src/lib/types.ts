@@ -5,7 +5,9 @@ export type SequenceStage =
   | "t_1h"
   | "live_now";
 
-export type PlanTier = "pilot" | "starter" | "pro";
+export type PlanTier = "pilot" | "event_pass" | "event_scale" | "starter" | "pro";
+
+export type SenderMode = "shared_showup" | "own_waba";
 
 export interface ShowUpTenant {
   id: string;
@@ -70,6 +72,10 @@ export interface ShowUpEvent {
   offer_price_kes: number;
   expected_close_rate: number;
   status: "upcoming" | "live" | "completed" | "cancelled";
+  is_paid?: boolean;
+  sender_mode?: SenderMode;
+  paid_pass_tier?: "event_pass" | "event_scale" | "starter" | "pro";
+  mpesa_receipt?: string | null;
   created_at: string;
 }
 
@@ -113,7 +119,8 @@ export interface ShowUpScheduledMessage {
 export interface ShowUpPayment {
   id: string;
   tenant_id: string;
-  plan_tier: "starter" | "pro";
+  event_id?: string | null;
+  plan_tier: "event_pass" | "event_scale" | "starter" | "pro";
   amount_kes: number;
   phone_e164: string;
   checkout_request_id?: string | null;

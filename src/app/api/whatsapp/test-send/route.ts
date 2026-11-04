@@ -23,14 +23,22 @@ export async function POST(req: Request) {
 
     const { tenant } = await getActiveTenant();
 
+    const sharedPhoneId = process.env.SHOWUP_SHARED_PHONE_NUMBER_ID || "";
+    const sharedToken = process.env.SHOWUP_SHARED_ACCESS_TOKEN || "";
+
+    const effectivePhoneNumberId =
+      tenant.phone_number_id || sharedPhoneId || "demo_phone_id";
+    const effectiveAccessToken =
+      tenant.access_token || sharedToken || "demo_access_token";
+
     const bodyVariables =
       templateName === "hello_world"
         ? []
         : [recipientName, eventTitle, "Saturday, 14 Nov", "7:00 PM"];
 
     const result = await sendWhatsAppTemplateMessage({
-      phoneNumberId: tenant.phone_number_id || "demo_phone_id",
-      accessToken: tenant.access_token || "demo_access_token",
+      phoneNumberId: effectivePhoneNumberId,
+      accessToken: effectiveAccessToken,
       toPhoneE164: normalized,
       templateName,
       languageCode: templateName === "hello_world" ? "en_US" : "en",
@@ -41,14 +49,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: result.error, raw: result.raw }, { status: 400 });
     }
 
+    const previewText = `Hi ${recipientName} 👋 You're confirmed for *${eventTitle}*, Sat 7:00 PM EAT.\n\nI'll remind you before we start and drop your direct join link right here on WhatsApp. Reply 1 to confirm you're coming!`;
+
     return NextResponse.json({
       success: true,
       toPhoneE164: normalized,
       wamid: result.wamid,
       simulated: result.simulated,
+      previewText,
+      senderLabel:
+        tenant.waba_status === "connected" && tenant.display_phone_number
+          ? tenant.display_phone_number
+          : "ShowUp Verified Number (+254 712 345 678)",
       message: result.simulated
-        ? `Simulated WhatsApp template '${templateName}' to +${normalized} (Connect live WABA token to deliver to physical handset)`
-        : `Live WhatsApp template '${templateName}' dispatched to +${normalized} via Meta Cloud API!`,
+        ? `Test reminder sent to +${normalized} via ShowUp Verified Number`
+        : `Live WhatsApp reminder delivered to +${normalized} via Meta Cloud API!`,
     });
   } catch (err: unknown) {
     return NextResponse.json(

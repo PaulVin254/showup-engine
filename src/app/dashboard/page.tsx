@@ -3,18 +3,18 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowRight,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Copy,
-  CreditCard,
   Database,
+  Download,
   ExternalLink,
   FileSpreadsheet,
-  Flame,
-  LayoutDashboard,
   Loader2,
-  MessageSquare,
   Play,
   Plus,
   RefreshCw,
@@ -24,7 +24,6 @@ import {
   Sparkles,
   TrendingUp,
   Upload,
-  UserPlus,
   Users,
 } from "lucide-react";
 import {
@@ -43,8 +42,8 @@ import {
 } from "@/lib/default-templates";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { EmbeddedSignupModal } from "@/components/whatsapp/EmbeddedSignupModal";
-import { RoiReportModal } from "@/components/roi/RoiReportModal";
-import { BrandWordmark } from "@/components/BrandMark";
+import { EventSetupWizard } from "@/components/wizard/EventSetupWizard";
+import { BrandRibbon, BrandWordmark } from "@/components/BrandMark";
 
 const STAGES_META: Array<{
   key: SequenceStage;
@@ -52,17 +51,49 @@ const STAGES_META: Array<{
   label: string;
   timing: string;
 }> = [
-  { key: "instant_welcome", step: 1, label: "Instant Confirmation", timing: "Immediate (T+0s)" },
-  { key: "calendar_link", step: 2, label: "Calendar Lock-In", timing: "+2 Mins After Signup" },
-  { key: "t_24h", step: 3, label: "24h Value Teaser", timing: "24 Hours Before Start" },
-  { key: "t_1h", step: 4, label: "1h Countdown Alert", timing: "60 Mins Before Start" },
-  { key: "live_now", step: 5, label: "We Are Live + Join Link", timing: "5 Mins Before Start" },
+  {
+    key: "instant_welcome",
+    step: 1,
+    label: "Welcome message",
+    timing: "Sent on signup",
+  },
+  {
+    key: "calendar_link",
+    step: 2,
+    label: "Calendar lock-in",
+    timing: "+2 mins after signup",
+  },
+  {
+    key: "t_24h",
+    step: 3,
+    label: "24h reminder",
+    timing: "24 hours before start (EAT)",
+  },
+  {
+    key: "t_1h",
+    step: 4,
+    label: "1h countdown",
+    timing: "60 mins before start (EAT)",
+  },
+  {
+    key: "live_now",
+    step: 5,
+    label: "Join link",
+    timing: "5 mins before start (EAT)",
+  },
 ];
 
+type TrackerViewState =
+  | "zero"
+  | "wizard"
+  | "active"
+  | "live_window"
+  | "finished";
+
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<
-    "events" | "templates" | "whatsapp" | "billing"
-  >("events");
+  const [topNav, setTopNav] = useState<"events" | "account">("events");
+  const [trackerView, setTrackerView] = useState<TrackerViewState>("active");
+
   const [loading, setLoading] = useState(true);
   const [supabaseReady, setSupabaseReady] = useState(false);
   const [tenant, setTenant] = useState<ShowUpTenant | null>(null);
@@ -70,68 +101,52 @@ export default function DashboardPage() {
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [templates, setTemplates] = useState<ShowUpTemplate[]>([]);
   const [registrants, setRegistrants] = useState<ShowUpRegistrant[]>([]);
-  const [scheduledMessages, setScheduledMessages] = useState<ShowUpScheduledMessage[]>([]);
+  const [scheduledMessages, setScheduledMessages] = useState<
+    ShowUpScheduledMessage[]
+  >([]);
   const [payments, setPayments] = useState<ShowUpPayment[]>([]);
   const [metaConfigId, setMetaConfigId] = useState("1433645942194259");
   const [metaAppId, setMetaAppId] = useState("");
 
-  // Modals & notifications
+  // Query param pre-fills from Homepage test flow
+  const [prefillTitle, setPrefillTitle] = useState("");
+  const [prefillPhone, setPrefillPhone] = useState("");
+  const [wizardInitialEvent, setWizardInitialEvent] =
+    useState<ShowUpEvent | null>(null);
+
+  // Modals & UI drawers
   const [isEmbeddedModalOpen, setIsEmbeddedModalOpen] = useState(false);
-  const [isRoiModalOpen, setIsRoiModalOpen] = useState(false);
-  const [isNewEventModalOpen, setIsNewEventModalOpen] = useState(false);
+  const [showLeadsDrawer, setShowLeadsDrawer] = useState(false);
+  const [showAdvancedAccount, setShowAdvancedAccount] = useState(false);
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // Quick Add Registrant state
+  // Quick Add Registrant state (inside collapsible drawer)
   const [quickName, setQuickName] = useState("");
   const [quickPhone, setQuickPhone] = useState("");
   const [addingLead, setAddingLead] = useState(false);
 
-  // Live Test WhatsApp state
-  const [testPhone, setTestPhone] = useState("0712345678");
-  const [testTemplate, setTestTemplate] = useState("event_registration_confirmed");
-  const [sendingTest, setSendingTest] = useState(false);
-
-  // Dispatching stage state
+  // Preview test message state
+  const [sendingPreview, setSendingPreview] = useState(false);
   const [dispatchingStage, setDispatchingStage] = useState<string | null>(null);
 
-  // New Event Form state
-  const [newTitle, setNewTitle] = useState("");
-  const [newHostName, setNewHostName] = useState("Brian");
-  const [newTeaserHook, setNewTeaserHook] = useState(
-    "how to build a predictable 60% webinar attendance engine in Kenya"
-  );
-  const [newStartsAt, setNewStartsAt] = useState(() => {
-    const d = new Date(Date.now() + 3 * 24 * 3600 * 1000);
-    return d.toISOString().slice(0, 16);
-  });
-  const [newJoinUrl, setNewJoinUrl] = useState("https://meet.google.com/landing");
-  const [newAdSpend, setNewAdSpend] = useState(50000);
-  const [newBaselinePct, setNewBaselinePct] = useState(20);
-  const [newOfferPrice, setNewOfferPrice] = useState(25000);
-  const [stageTplMap, setStageTplMap] = useState({
-    instant_welcome: "event_registration_confirmed",
-    calendar_link: "event_calendar_link",
-    t_24h: "event_teaser_24h",
-    t_1h: "event_starting_1h",
-    live_now: "event_live_now",
-  });
-  const [creatingEvent, setCreatingEvent] = useState(false);
+  // Post-Event ROI Inline Calculator state (State C: Finished)
+  const [roiAdSpend, setRoiAdSpend] = useState(12000);
+  const [roiOfferPrice, setRoiOfferPrice] = useState(25000);
+  const [roiCloseRate, setRoiCloseRate] = useState(6);
 
-  // Template Studio state
+  // Account: Custom Template Builder (Progressive Disclosure)
   const [customTplName, setCustomTplName] = useState("");
-  const [customTplCategory, setCustomTplCategory] = useState<"UTILITY" | "MARKETING">(
-    "UTILITY"
-  );
-  const [customTplStage, setCustomTplStage] = useState<SequenceStage | "custom">("t_24h");
+  const [customTplCategory, setCustomTplCategory] = useState<
+    "UTILITY" | "MARKETING"
+  >("UTILITY");
+  const [customTplStage, setCustomTplStage] = useState<
+    SequenceStage | "custom"
+  >("t_24h");
   const [customTplBody, setCustomTplBody] = useState(
     "Hi {{1}}, quick reminder that {{2}} goes live tomorrow at {{3}} (EAT) 🎯\n\nHosted by {{4}}: {{5}}.\n\nSee you inside!"
   );
   const [creatingTemplate, setCreatingTemplate] = useState(false);
-
-  // M-Pesa Billing state
-  const [mpesaPhone, setMpesaPhone] = useState("0712345678");
-  const [processingMpesa, setProcessingMpesa] = useState<string | null>(null);
 
   const loadWorkspace = useCallback(async () => {
     try {
@@ -139,7 +154,8 @@ export default function DashboardPage() {
       const data = await res.json();
       setSupabaseReady(Boolean(data.supabaseReady));
       setTenant(data.tenant || null);
-      setEvents(data.events || []);
+      const loadedEvents: ShowUpEvent[] = data.events || [];
+      setEvents(loadedEvents);
       setTemplates(data.templates || []);
       setRegistrants(data.registrants || []);
       setScheduledMessages(data.scheduled_messages || []);
@@ -147,8 +163,11 @@ export default function DashboardPage() {
       if (data.metaConfigId) setMetaConfigId(data.metaConfigId);
       if (data.metaAppId) setMetaAppId(data.metaAppId);
 
-      if (!selectedEventId && data.events?.length > 0) {
-        setSelectedEventId(data.events[0].id);
+      if (!selectedEventId && loadedEvents.length > 0) {
+        setSelectedEventId(loadedEvents[0].id);
+      }
+      if (loadedEvents.length === 0) {
+        setTrackerView("zero");
       }
     } finally {
       setLoading(false);
@@ -158,6 +177,20 @@ export default function DashboardPage() {
   useEffect(() => {
     loadWorkspace();
   }, [loadWorkspace]);
+
+  // Check URL params for ?setup=1&title=...&phone=...
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("setup") === "1") {
+      const t = params.get("title") || "";
+      const p = params.get("phone") || "";
+      if (t) setPrefillTitle(t);
+      if (p) setPrefillPhone(p);
+      setWizardInitialEvent(null);
+      setTrackerView("wizard");
+    }
+  }, []);
 
   const showToast = (msg: string) => {
     setBannerNotice(msg);
@@ -179,41 +212,47 @@ export default function DashboardPage() {
     ? scheduledMessages.filter((m) => m.event_id === activeEvent.id)
     : [];
 
-  // Funnel stats for active event
+  // 4 Core Numbers for the Single-Event Tracker
   const totalRegCount = eventRegistrants.length;
+  const deliveredRegIds = new Set(
+    eventMessages
+      .filter((m) => ["sent", "delivered", "read"].includes(m.status))
+      .map((m) => m.registrant_id)
+  );
+  const deliveredCount =
+    deliveredRegIds.size > 0 ? deliveredRegIds.size : totalRegCount;
+  const confirmedImInCount = Math.max(
+    eventRegistrants.filter((r) => !r.opted_out && r.consent_given).length,
+    0
+  );
   const attendedCount = eventRegistrants.filter(
     (r) => r.clicked_join_link || r.zoom_verified
   ).length;
   const liveShowupPct =
     totalRegCount > 0 ? Math.round((attendedCount / totalRegCount) * 100) : 0;
-  const baselinePct = activeEvent?.baseline_showup_rate || 20;
+  const baselinePct = activeEvent?.baseline_showup_rate || 18;
 
-  const handleQuickAddRegistrant = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeEvent || !quickName || !quickPhone) return;
-    setAddingLead(true);
+  const handleSendSelfPreview = async () => {
+    if (!tenant) return;
+    setSendingPreview(true);
     try {
-      const res = await fetch(`/api/events/${activeEvent.id}/register`, {
+      const res = await fetch("/api/whatsapp/test-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fullName: quickName,
-          phone: quickPhone,
-          source: "manual_test",
+          toPhone: prefillPhone || tenant.phone_e164 || "0712345678",
+          recipientName: "Founder",
+          eventTitle: activeEvent?.title || "Free Real Estate Masterclass",
+          templateName: "event_registration_confirmed",
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setQuickName("");
-      setQuickPhone("");
-      showToast(
-        `Added ${data.registrant.full_name} (+${data.registrant.phone_e164}) & fired Stage 1 Welcome!`
-      );
-      await loadWorkspace();
+      showToast(data.message);
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Failed adding lead");
+      showToast(err instanceof Error ? err.message : "Preview send failed");
     } finally {
-      setAddingLead(false);
+      setSendingPreview(false);
     }
   };
 
@@ -240,14 +279,57 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSampleCsvImport = async (mode: "registrants" | "attendance_reconcile") => {
+  const handleQuickAddRegistrant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeEvent || !quickName || !quickPhone) return;
+    setAddingLead(true);
+    try {
+      const res = await fetch(`/api/events/${activeEvent.id}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: quickName,
+          phone: quickPhone,
+          source: "manual_test",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setQuickName("");
+      setQuickPhone("");
+      showToast(
+        `Added ${data.registrant.full_name} (+${data.registrant.phone_e164}) & sent welcome reminder!`
+      );
+      await loadWorkspace();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed adding person");
+    } finally {
+      setAddingLead(false);
+    }
+  };
+
+  const handleSampleCsvImport = async (
+    mode: "registrants" | "attendance_reconcile"
+  ) => {
     if (!activeEvent) return;
     const sampleRows =
       mode === "registrants"
         ? [
-            { name: "Grace Muthoni", phone: "0721 884 920", email: "grace.m@gmail.com" },
-            { name: "Samuel Kariuki", phone: "+254 710 553 190", email: "skariuki@gmail.com" },
-            { name: "Esther Wambui", phone: "0110 442 819", email: "esther.w@yahoo.com" },
+            {
+              name: "Grace Muthoni",
+              phone: "0721 884 920",
+              email: "grace.m@gmail.com",
+            },
+            {
+              name: "Samuel Kariuki",
+              phone: "+254 710 553 190",
+              email: "skariuki@gmail.com",
+            },
+            {
+              name: "Esther Wambui",
+              phone: "0110 442 819",
+              email: "esther.w@yahoo.com",
+            },
           ]
         : [
             { name: "Mercy Njeri", phone: "254799110505", duration: 62 },
@@ -268,61 +350,32 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSendTestMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSendingTest(true);
-    try {
-      const res = await fetch("/api/whatsapp/test-send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          toPhone: testPhone,
-          recipientName: "Founder",
-          eventTitle: activeEvent?.title || "ShowUp Live Webinar",
-          templateName: testTemplate,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      showToast(data.message);
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Test send failed");
-    } finally {
-      setSendingTest(false);
-    }
+  const handleDownloadAttendeesCsv = () => {
+    if (!activeEvent) return;
+    const header = "Full Name,Phone (E164),Source,Attended Live\n";
+    const rows = eventRegistrants
+      .map(
+        (r) =>
+          `"${r.full_name}",+${r.phone_e164},${r.source},${
+            r.clicked_join_link || r.zoom_verified ? "YES" : "NO"
+          }`
+      )
+      .join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${activeEvent.slug}-attendees.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Downloaded attendee list CSV!");
   };
 
-  const handleCreateEvent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreatingEvent(true);
-    try {
-      const res = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTitle,
-          hostName: newHostName,
-          teaserHook: newTeaserHook,
-          startsAt: new Date(newStartsAt).toISOString(),
-          joinUrl: newJoinUrl,
-          stageTemplates: stageTplMap,
-          adSpendKes: newAdSpend,
-          baselineShowupRate: newBaselinePct,
-          offerPriceKes: newOfferPrice,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setIsNewEventModalOpen(false);
-      setNewTitle("");
-      await loadWorkspace();
-      setSelectedEventId(data.event.id);
-      showToast(`Created webinar "${data.event.title}"!`);
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Could not create event");
-    } finally {
-      setCreatingEvent(false);
-    }
+  const handleDuplicateWebinar = () => {
+    if (!activeEvent) return;
+    setPrefillTitle(`${activeEvent.title} (Next Session)`);
+    setWizardInitialEvent(null);
+    setTrackerView("wizard");
   };
 
   const handleCreateCustomTemplate = async (e: React.FormEvent) => {
@@ -349,138 +402,110 @@ export default function DashboardPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setCustomTplName("");
-      showToast(
-        `Saved template '${data.template.name}' (${data.template.status}) and synced with Template Studio!`
-      );
+      showToast(`Saved custom template '${data.template.name}'!`);
       await loadWorkspace();
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Failed creating template");
+      showToast(
+        err instanceof Error ? err.message : "Failed creating template"
+      );
     } finally {
       setCreatingTemplate(false);
-    }
-  };
-
-  const handleMpesaUpgrade = async (planTier: "starter" | "pro") => {
-    setProcessingMpesa(planTier);
-    try {
-      const res = await fetch("/api/billing/stk-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planTier,
-          phone: mpesaPhone,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      showToast(data.message);
-      await loadWorkspace();
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "M-Pesa payment failed");
-    } finally {
-      setProcessingMpesa(null);
     }
   };
 
   if (loading || !tenant) {
     return (
       <div className="min-h-screen bg-canvas flex items-center justify-center text-[#94a3b8]">
-        <Loader2 className="w-6 h-6 animate-spin mr-2 text-electric-hover" />
-        Loading ShowUp Engine Command Center...
+        <Loader2 className="w-5 h-5 animate-spin mr-2 text-[#4589ff]" />
+        Loading ShowUp...
       </div>
     );
   }
 
+  const originUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3005";
+
+  // Countdown math
+  const startsMs = activeEvent
+    ? new Date(activeEvent.starts_at).getTime() - Date.now()
+    : 0;
+  const daysLeft = Math.max(0, Math.floor(startsMs / (1000 * 60 * 60 * 24)));
+  const hoursLeft = Math.max(
+    0,
+    Math.floor((startsMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  );
+  const minsLeft = Math.max(
+    0,
+    Math.floor((startsMs % (1000 * 60 * 60)) / (1000 * 60))
+  );
+
+  // Post-Event ROI calculations (State C)
+  const baselineAttendeesCount = Math.max(
+    1,
+    Math.round((baselinePct / 100) * Math.max(totalRegCount, 1))
+  );
   const extraAttendeesCount = Math.max(
     0,
-    attendedCount - Math.round((baselinePct / 100) * totalRegCount)
+    attendedCount - baselineAttendeesCount
   );
-  const attributedSalesKes = Math.round(
-    extraAttendeesCount * ((activeEvent?.expected_close_rate || 6) / 100) * (activeEvent?.offer_price_kes || 0)
+  const costPerAttendeeKes =
+    attendedCount > 0 ? Math.round(roiAdSpend / attendedCount) : roiAdSpend;
+  const costPerAttendeeBeforeKes = Math.round(
+    roiAdSpend / baselineAttendeesCount
   );
-  const roiMultiple = (attributedSalesKes / 4999).toFixed(1);
-  const formatKesShort = (n: number) =>
-    n >= 1_000_000 ? `KES ${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `KES ${Math.round(n / 1000)}k` : `KES ${n}`;
-
-  const originUrl =
-    typeof window !== "undefined" ? window.location.origin : "http://localhost:3005";
+  const extraRevenueKes = Math.round(
+    extraAttendeesCount * (roiCloseRate / 100) * roiOfferPrice
+  );
 
   return (
     <div className="min-h-screen bg-canvas text-slate-100 flex flex-col">
-      {/* Edge-to-edge Muse command bar */}
+      {/* Minimal Top Navigation: Brand · Events · Account */}
       <header className="sticky top-0 z-30 w-full px-6 sm:px-10 py-4 bg-canvas/90 backdrop-blur-md border-b border-white/[0.06]">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/">
-              <BrandWordmark subtitle={tenant.business_name} />
-            </Link>
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          <Link href="/" aria-label="ShowUp Home">
+            <BrandWordmark />
+          </Link>
 
-            <span className="hidden lg:inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-[#25272c] text-[#9ca3af]">
-              <strong className="text-white uppercase font-medium">{tenant.plan_tier}</strong>
-              <span className="font-mono tracking-tight">
-                {tenant.registrants_used_this_month}/{tenant.registrant_limit}
-              </span>
-              leads
-            </span>
-          </div>
-
-          {/* Pill navigation tabs */}
-          <nav className="order-3 md:order-2 w-full md:w-auto flex justify-center">
-            <div className="inline-flex gap-1 p-1 rounded-full bg-[#17191e] border border-white/[0.06] overflow-x-auto max-w-full">
-              {[
-                { id: "events", label: "Events", icon: LayoutDashboard },
-                { id: "templates", label: "Templates", icon: Sparkles },
-                { id: "whatsapp", label: "WhatsApp API", icon: Smartphone },
-                { id: "billing", label: "Billing", icon: CreditCard },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 whitespace-nowrap transition ${
-                      isActive
-                        ? "bg-[#25272c] text-white"
-                        : "text-[#8a909e] hover:text-white"
-                    }`}
-                  >
-                    <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[#4589ff]" : ""}`} />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
-
-          <div className="order-2 md:order-3 flex items-center gap-2">
-            {/* WABA Connection Status Button */}
-            <button
-              onClick={() => setIsEmbeddedModalOpen(true)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition ${
-                tenant.waba_status === "connected"
-                  ? "bg-[#25272c] text-[#e2e8f0] hover:bg-[#2f3238]"
-                  : "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  tenant.waba_status === "connected"
-                    ? "bg-[#4589ff]"
-                    : "bg-amber-400 animate-ping"
+          <div className="flex items-center gap-2">
+            <div className="inline-flex p-1 rounded-full bg-[#17191e] border border-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => setTopNav("events")}
+                className={`px-4 py-1.5 rounded-full text-xs font-medium transition ${
+                  topNav === "events"
+                    ? "bg-[#25272c] text-white"
+                    : "text-[#8a909e] hover:text-white"
                 }`}
-              />
-              {tenant.waba_status === "connected"
-                ? `WABA Connected (${tenant.display_phone_number || tenant.phone_number_id})`
-                : "Connect Official WhatsApp"}
-            </button>
+              >
+                Events
+              </button>
+              <button
+                type="button"
+                onClick={() => setTopNav("account")}
+                className={`px-4 py-1.5 rounded-full text-xs font-medium transition ${
+                  topNav === "account"
+                    ? "bg-[#25272c] text-white"
+                    : "text-[#8a909e] hover:text-white"
+                }`}
+              >
+                Account
+              </button>
+            </div>
 
             <button
-              onClick={() => setIsNewEventModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium text-white bg-[#1877f2] hover:bg-[#2e86f8] transition"
+              type="button"
+              onClick={() => {
+                setTopNav("events");
+                setWizardInitialEvent(null);
+                setPrefillTitle("");
+                setTrackerView("wizard");
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium text-white bg-[#4589ff] hover:bg-[#5896ff] transition"
             >
-              <Plus className="w-4 h-4" />
-              New Webinar
+              <Plus className="w-3.5 h-3.5" />
+              New webinar
             </button>
           </div>
         </div>
@@ -488,33 +513,23 @@ export default function DashboardPage() {
 
       {/* Toast Notification */}
       {bannerNotice && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-5 py-3 rounded-full bg-surface-elevated border border-white/[0.1] shadow-glow text-xs text-slate-100 font-medium">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-5 py-3 rounded-full bg-[#25272c] border border-white/[0.12] shadow-2xl text-xs text-white font-medium">
           {bannerNotice}
         </div>
       )}
 
-      {/* Main Content Container */}
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 space-y-6">
-        {/* TAB 1: LIVE EVENTS & SEQUENCE COMMAND CENTER */}
-        {activeTab === "events" && activeEvent && (
-          <div className="space-y-6">
-            {/* Top Event Switcher & Actions */}
-            <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-electric-subtle text-electric-hover border border-electric/30">
-                    Active Campaign
-                  </span>
-                  <span className="text-xs text-[#94a3b8]">
-                    {formatEatDate(activeEvent.starts_at).fullStr}
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 pt-1">
+      {/* MAIN SINGLE-TRACK CONTAINER */}
+      <main className="max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 flex-1 space-y-6">
+        {topNav === "events" && (
+          <>
+            {/* Subtle Lifecycle State Bar (Lets host / reviewer switch between the 3 core states + Setup Wizard effortlessly) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                {events.length > 1 && trackerView !== "zero" && (
                   <select
-                    value={activeEvent.id}
+                    value={activeEvent?.id || ""}
                     onChange={(e) => setSelectedEventId(e.target.value)}
-                    className="bg-canvas border border-white/[0.08] rounded-full px-3.5 py-2 text-base sm:text-lg font-bold text-white focus:outline-none focus:border-electric"
+                    className="bg-[#17191e] border border-white/[0.08] rounded-full px-3.5 py-1.5 text-xs font-medium text-white focus:outline-none focus:border-[#4589ff]"
                   >
                     {events.map((ev) => (
                       <option key={ev.id} value={ev.id}>
@@ -522,526 +537,904 @@ export default function DashboardPage() {
                       </option>
                     ))}
                   </select>
-
-                  <Link
-                    href={`/r/${activeEvent.slug}`}
-                    target="_blank"
-                    className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-electric-hover font-medium transition"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Public Registration Page (/r/{activeEvent.slug})
-                  </Link>
-                </div>
+                )}
+                <span className="text-[11px] text-[#8a909e]">
+                  Tracker state preview:
+                </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                  onClick={() =>
-                    copyText(
-                      "regUrl",
-                      `${originUrl}/r/${activeEvent.slug}`
-                    )
-                  }
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-slate-200"
-                >
-                  {copiedKey === "regUrl" ? (
-                    <Check className="w-3.5 h-3.5 text-electric-hover" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5 text-[#94a3b8]" />
-                  )}
-                  Copy Funnel Link
-                </button>
-
-                <button
-                  onClick={() => setIsRoiModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-white font-medium text-xs transition"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  Generate Post-Webinar ROI Report
-                </button>
-              </div>
-            </div>
-
-            {/* Event cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {events.map((ev) => {
-                const isActive = ev.id === activeEvent.id;
-                const regs = registrants.filter((r) => r.event_id === ev.id).length;
-                return (
+              <div className="inline-flex flex-wrap gap-1 p-1 rounded-full bg-[#17191e] border border-white/[0.06] text-[11px]">
+                {[
+                  { id: "zero", label: "State A: 0 Events" },
+                  { id: "wizard", label: "3-Step Setup" },
+                  { id: "active", label: "State B: Counting Down" },
+                  { id: "live_window", label: "🔴 Live Window" },
+                  { id: "finished", label: "State C: Finished + ROI" },
+                ].map((s) => (
                   <button
-                    key={ev.id}
+                    key={s.id}
                     type="button"
-                    onClick={() => setSelectedEventId(ev.id)}
-                    className={`text-left rounded-3xl p-5 transition-all duration-200 hover:-translate-y-0.5 ${
-                      isActive
-                        ? "bg-surface-elevated shadow-[inset_0_0_0_1px_rgba(69,137,255,0.45)]"
-                        : "bg-surface hover:bg-surface-elevated"
+                    onClick={() => setTrackerView(s.id as TrackerViewState)}
+                    className={`px-3 py-1 rounded-full transition ${
+                      trackerView === s.id
+                        ? "bg-[#25272c] text-white font-medium"
+                        : "text-[#8a909e] hover:text-white"
                     }`}
                   >
-                    <div className="flex items-center gap-2 text-[11px] text-[#8a909e]">
-                      <span className={`w-2 h-2 rounded-full ${isActive ? "bg-[#4589ff]" : "bg-[#64748b]"}`} />
-                      {formatEatDate(ev.starts_at).fullStr}
-                    </div>
-                    <div className="mt-2 text-base font-medium text-[#f8fafc] tracking-tight leading-snug">{ev.title}</div>
-                    <div className="mt-1 text-xs text-[#8a909e]">
-                      Hosted by {ev.host_name} ·{" "}
-                      <span className="font-mono tracking-tight">{regs}</span> registrants
-                    </div>
+                    {s.label}
                   </button>
-                );
-              })}
-            </div>
-
-            {/* Metric highlights strip */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-px rounded-3xl overflow-hidden bg-white/[0.06] border border-white/[0.06]">
-              {[
-                { v: `${liveShowupPct}%`, l: "Live attendance", sub: `${attendedCount} of ${totalRegCount} vs ${baselinePct}% baseline` },
-                { v: `${roiMultiple}x`, l: "ROI vs subscription", sub: "Extra revenue / Ksh 4,999" },
-                { v: formatKesShort(attributedSalesKes), l: "Attributed sales", sub: "From extra attendees" },
-              ].map((m) => (
-                <div key={m.l} className="bg-surface px-8 py-5 text-center sm:text-left">
-                  <div className="font-mono tracking-tight text-4xl font-medium text-[#f8fafc]">{m.v}</div>
-                  <div className="text-xs text-[#94a3b8] mt-1">{m.l}</div>
-                  <div className="text-[11px] text-[#64748b]">{m.sub}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Room Fill Progress Bar (The "Aha! Moment" Widget) */}
-            <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Flame className="w-4 h-4 text-electric-hover" />
-                    Live Room Fill Rate vs. Historical Email/SMS Baseline
-                  </h3>
-                  <p className="text-xs text-[#94a3b8]">
-                    Tracks real-time clicks on each registrant&apos;s personalized{" "}
-                    <code className="text-electric-hover">/j/[token]</code> WhatsApp join
-                    button + verified Zoom/Meet CSV uploads.
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-extrabold text-electric-hover">
-                    {liveShowupPct}%
-                  </span>
-                  <span className="text-xs text-[#94a3b8] ml-1.5">
-                    ({attendedCount} of {totalRegCount} attended vs {baselinePct}% baseline)
-                  </span>
-                </div>
-              </div>
-
-              <div className="relative h-4 w-full bg-canvas rounded-full overflow-hidden border border-white/[0.08]">
-                {/* Baseline marker line */}
-                <div
-                  style={{ left: `${Math.min(95, baselinePct)}%` }}
-                  className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-10"
-                  title={`Historical Baseline: ${baselinePct}%`}
-                />
-                <div
-                  style={{ width: `${Math.min(100, liveShowupPct)}%` }}
-                  className="h-full bg-electric shadow-glow rounded-full transition-all duration-500"
-                />
-              </div>
-
-              <div className="flex justify-between text-[11px] text-[#94a3b8]">
-                <span>0%</span>
-                <span className="text-red-400 font-medium">
-                  ▲ Past Email/SMS Baseline ({baselinePct}%)
-                </span>
-                <span className="text-electric-hover font-medium">
-                  Target WhatsApp Show-Up (55%–65%)
-                </span>
-                <span>100%</span>
-              </div>
-            </div>
-
-            {/* 5-Stage Automated Sequence Pipeline */}
-            <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-base font-bold text-white">
-                    5-Stage Automated WhatsApp Sequence (Upstash QStash + Meta Cloud API)
-                  </h3>
-                  <p className="text-xs text-[#94a3b8]">
-                    Stage 1 fires on signup; Stages 2–5 fire automatically at their EAT
-                    countdown timestamps—or click &ldquo;Fire Stage Now&rdquo; to trigger
-                    immediately.
-                  </p>
-                </div>
-                <span className="text-xs text-electric-hover font-mono">
-                  Timezone: Africa/Nairobi (EAT / UTC+3)
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                {STAGES_META.map((st) => {
-                  const assignedTplName =
-                    activeEvent.stage_templates?.[st.key] ||
-                    DEFAULT_WEBINAR_TEMPLATES[st.step - 1].name;
-                  const stageMsgs = eventMessages.filter((m) => m.stage === st.key);
-                  const sentCount = stageMsgs.filter((m) =>
-                    ["sent", "delivered", "read"].includes(m.status)
-                  ).length;
-
-                  return (
-                    <div
-                      key={st.key}
-                      className="bg-canvas border border-white/[0.08] rounded-xl p-4 flex flex-col justify-between space-y-3"
-                    >
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-electric-subtle text-electric-hover border border-electric/30">
-                            Stage {st.step}
-                          </span>
-                          <span className="text-[11px] text-[#94a3b8]">
-                            {sentCount}/{totalRegCount} sent
-                          </span>
-                        </div>
-                        <div className="text-xs font-bold text-white">{st.label}</div>
-                        <div className="text-[11px] text-[#94a3b8] flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-electric-hover" />
-                          {st.timing}
-                        </div>
-                        <div className="pt-1">
-                          <span className="text-[10px] text-[#64748b] block">
-                            Active Template:
-                          </span>
-                          <code className="text-[11px] text-[#7db4ff] break-all">
-                            {assignedTplName}
-                          </code>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleFireStageNow(st.key)}
-                        disabled={dispatchingStage === st.key}
-                        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full bg-surface hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-white transition disabled:opacity-50"
-                      >
-                        {dispatchingStage === st.key ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-electric-hover" />
-                        ) : (
-                          <Play className="w-3.5 h-3.5 text-electric-hover" />
-                        )}
-                        Fire Stage {st.step} Now
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Lead Ingestion & Instant WhatsApp Test Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left: Add Lead / CSV Import / Zoom Reconcile */}
-              <div className="lg:col-span-7 bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <UserPlus className="w-4 h-4 text-electric-hover" />
-                    Ingest Webinar Leads (Hosted Page, CSV, or Meta Lead Ads)
-                  </h3>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleSampleCsvImport("registrants")}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-[11px] text-slate-200"
-                    >
-                      <Upload className="w-3.5 h-3.5 text-electric-hover" />
-                      Import Sample Leads CSV
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSampleCsvImport("attendance_reconcile")}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-[11px] text-[#7db4ff]"
-                    >
-                      <FileSpreadsheet className="w-3.5 h-3.5 text-electric-hover" />
-                      Reconcile Zoom CSV
-                    </button>
-                  </div>
-                </div>
-
-                <form
-                  onSubmit={handleQuickAddRegistrant}
-                  className="grid grid-cols-1 sm:grid-cols-12 gap-2.5"
-                >
-                  <input
-                    type="text"
-                    required
-                    placeholder="Lead Full Name (e.g. Jane Wanjiru)"
-                    value={quickName}
-                    onChange={(e) => setQuickName(e.target.value)}
-                    className="sm:col-span-5 px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
-                  />
-                  <input
-                    type="tel"
-                    required
-                    placeholder="Kenyan Phone (0712 345 678)"
-                    value={quickPhone}
-                    onChange={(e) => setQuickPhone(e.target.value)}
-                    className="sm:col-span-4 px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white font-mono"
-                  />
-                  <button
-                    type="submit"
-                    disabled={addingLead}
-                    className="sm:col-span-3 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full bg-electric hover:bg-electric-hover text-white font-bold text-xs transition"
-                  >
-                    {addingLead ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Plus className="w-3.5 h-3.5" />
-                    )}
-                    Add &amp; Trigger
-                  </button>
-                </form>
-
-                <div className="p-3 rounded-xl bg-canvas border border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <div className="text-[#94a3b8]">
-                    Universal Lead Webhook (Tally / Typeform / Zapier / Make):
-                    <code className="ml-2 text-[#7db4ff]">
-                      POST {originUrl}/api/events/{activeEvent.id}/register
-                    </code>
-                  </div>
-                  <button
-                    onClick={() =>
-                      copyText(
-                        "whUrl",
-                        `${originUrl}/api/events/${activeEvent.id}/register`
-                      )
-                    }
-                    className="text-electric-hover hover:underline font-medium shrink-0"
-                  >
-                    {copiedKey === "whUrl" ? "Copied!" : "Copy URL"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Right: Live Handset Test Sender */}
-              <div className="lg:col-span-5 bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-3">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Send className="w-4 h-4 text-electric-hover" />
-                  Send Instant Test Reminder to Your Phone
-                </h3>
-                <p className="text-xs text-[#94a3b8]">
-                  Use this during client demos: enter their Safaricom/Airtel number and let
-                  them watch the template land on their phone in 2 seconds.
-                </p>
-
-                <form onSubmit={handleSendTestMessage} className="space-y-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <input
-                      type="tel"
-                      required
-                      placeholder="0712 345 678"
-                      value={testPhone}
-                      onChange={(e) => setTestPhone(e.target.value)}
-                      className="px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white font-mono"
-                    />
-                    <select
-                      value={testTemplate}
-                      onChange={(e) => setTestTemplate(e.target.value)}
-                      className="px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
-                    >
-                      {templates.map((t) => (
-                        <option key={t.id} value={t.name}>
-                          {t.name} ({t.category})
-                        </option>
-                      ))}
-                      <option value="hello_world">hello_world (Meta Sandbox Default)</option>
-                    </select>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={sendingTest}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-canvas hover:bg-white/[0.08] border border-electric/30 text-[#7db4ff] font-semibold text-xs transition"
-                  >
-                    {sendingTest ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Send className="w-3.5 h-3.5" />
-                    )}
-                    Fire Test WhatsApp Message Now
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {/* Registrants Table */}
-            <div className="bg-surface border border-white/[0.08] rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-white/[0.08] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-electric-hover" />
-                  <h3 className="text-sm font-bold text-white">
-                    Webinar Registrants &amp; Live Join Click Tracking ({eventRegistrants.length})
-                  </h3>
-                </div>
-                <span className="text-xs text-[#94a3b8]">
-                  Click any <code className="text-electric-hover">/j/token</code> link to test
-                  attendance tracking
-                </span>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-white/[0.08] bg-canvas/60 text-[#94a3b8]">
-                      <th className="py-3 px-4">Registrant</th>
-                      <th className="py-3 px-4">WhatsApp (E.164)</th>
-                      <th className="py-3 px-4">Source</th>
-                      <th className="py-3 px-4">Tracked Join Link</th>
-                      <th className="py-3 px-4">Attendance Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/[0.06]/70">
-                    {eventRegistrants.map((reg) => (
-                      <tr key={reg.id} className="hover:bg-canvas/40">
-                        <td className="py-3 px-4 font-semibold text-white">
-                          {reg.full_name}
-                          {reg.email && (
-                            <span className="block text-[11px] text-[#94a3b8] font-normal">
-                              {reg.email}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-slate-200">
-                          {formatPhoneDisplay(reg.phone_e164)}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-full bg-canvas border border-white/[0.08] text-[#94a3b8] text-[11px]">
-                            {reg.source}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <a
-                            href={`/j/${reg.tracking_token}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={() => setTimeout(loadWorkspace, 1000)}
-                            className="inline-flex items-center gap-1 font-mono text-electric-hover hover:underline"
-                          >
-                            /j/{reg.tracking_token}
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </td>
-                        <td className="py-3 px-4">
-                          {reg.clicked_join_link || reg.zoom_verified ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-electric-subtle border border-electric/30 text-[#7db4ff] font-semibold text-[11px]">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              Attended Live
-                              {reg.zoom_duration_minutes
-                                ? ` (${reg.zoom_duration_minutes}m)`
-                                : ""}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-canvas border border-white/[0.08] text-[#94a3b8] text-[11px]">
-                              Awaiting Live Join
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: TEMPLATE STUDIO (BOTH PRE-APPROVED DEFAULTS + CUSTOM BUILDER) */}
-        {activeTab === "templates" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left: Existing Default + Custom Templates */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-white">
-                    WABA Message Templates ({templates.length})
-                  </h2>
-                  <p className="text-xs text-[#94a3b8]">
-                    Includes the 5 pre-approved ShowUp default templates + any custom
-                    templates submitted for your events.
-                  </p>
-                </div>
-                <button
-                  onClick={loadWorkspace}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-canvas hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-electric-hover"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Sync from Meta WABA
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {templates.map((tpl) => (
-                  <div
-                    key={tpl.id}
-                    className="bg-surface border border-white/[0.08] rounded-2xl p-4 space-y-2.5"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <code className="text-xs font-bold text-electric-hover">
-                          {tpl.name}
-                        </code>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-canvas border border-white/[0.08] text-[#94a3b8] font-mono">
-                          {tpl.category}
-                        </span>
-                        {tpl.is_system_default && (
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-electric-subtle text-[#7db4ff] border border-electric/30">
-                            Standard Pre-Approved
-                          </span>
-                        )}
-                      </div>
-                      <span
-                        className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                          tpl.status === "APPROVED"
-                            ? "bg-electric-subtle text-[#7db4ff] border border-electric/30"
-                            : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                        }`}
-                      >
-                        {tpl.status}
-                      </span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-[#0b141a] border border-electric/30 text-xs text-slate-200 whitespace-pre-wrap font-sans">
-                      {tpl.body_text}
-                    </div>
-                  </div>
                 ))}
               </div>
             </div>
 
-            {/* Right: Create Custom Template Builder */}
-            <div className="lg:col-span-5">
-              <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-4 sticky top-32">
+            {/* ========================================================= */}
+            {/* STATE A: 0 EVENTS (Clean Empty State)                     */}
+            {/* ========================================================= */}
+            {trackerView === "zero" && (
+              <div className="py-12">
+                <div className="max-w-lg mx-auto bg-[#17191e] border border-white/[0.08] rounded-3xl p-8 sm:p-10 text-center space-y-6">
+                  <div className="flex justify-center">
+                    <BrandRibbon className="w-16 h-14" />
+                  </div>
+                  <div className="space-y-2">
+                    <h1 className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-white">
+                      Fill your next live room on WhatsApp.
+                    </h1>
+                    <p className="text-xs sm:text-sm text-[#8a909e] leading-relaxed">
+                      Set up your webinar in 3 minutes. Share your registration
+                      link or paste your leads, and let ShowUp run the 5-stage
+                      countdown automatically.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWizardInitialEvent(null);
+                        setTrackerView("wizard");
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-white font-medium text-sm py-4 px-6 transition"
+                    >
+                      Create your first webinar
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={sendingPreview}
+                      onClick={handleSendSelfPreview}
+                      className="text-xs text-[#9ca3af] hover:text-white underline underline-offset-4 transition inline-flex items-center gap-1.5"
+                    >
+                      {sendingPreview && (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      )}
+                      Send me a test WhatsApp message first
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* 3-STEP GUIDED EVENT SETUP WIZARD                          */}
+            {/* ========================================================= */}
+            {trackerView === "wizard" && (
+              <EventSetupWizard
+                tenant={tenant}
+                initialEvent={wizardInitialEvent}
+                initialTitle={prefillTitle}
+                initialPhone={prefillPhone}
+                eventRegistrants={
+                  wizardInitialEvent
+                    ? registrants.filter(
+                        (r) => r.event_id === wizardInitialEvent.id
+                      )
+                    : eventRegistrants
+                }
+                originUrl={originUrl}
+                onCancel={
+                  events.length > 0 ? () => setTrackerView("active") : undefined
+                }
+                onEventSaved={async (savedEv) => {
+                  setWizardInitialEvent(savedEv);
+                  setSelectedEventId(savedEv.id);
+                  await loadWorkspace();
+                }}
+                onLaunched={async (launchedId, msg) => {
+                  setSelectedEventId(launchedId);
+                  await loadWorkspace();
+                  setTrackerView("active");
+                  showToast(msg);
+                }}
+                onOpenEmbeddedSignup={() => setIsEmbeddedModalOpen(true)}
+                onToast={showToast}
+              />
+            )}
+
+            {/* ========================================================= */}
+            {/* STATE B: ACTIVE EVENT (Counting Down or Live Window)      */}
+            {/* ========================================================= */}
+            {(trackerView === "active" || trackerView === "live_window") &&
+              activeEvent && (
+                <div className="space-y-6">
+                  {/* Hero Tracker Card */}
+                  <div className="bg-[#17191e] border border-white/[0.08] rounded-3xl p-6 sm:p-8 space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="space-y-1.5">
+                        <h1 className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-white">
+                          {activeEvent.title}
+                        </h1>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-[#9ca3af] font-mono">
+                          <span>
+                            {formatEatDate(activeEvent.starts_at).fullStr}
+                          </span>
+                          <span>·</span>
+                          <a
+                            href={activeEvent.join_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[#4589ff] hover:underline truncate max-w-[260px]"
+                          >
+                            {activeEvent.join_url.replace(/^https?:\/\//, "")}
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Countdown or LIVE badge */}
+                      {trackerView === "live_window" ? (
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-semibold animate-pulse">
+                          🔴 LIVE: {attendedCount} people joined from WhatsApp
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#25272c] border border-white/[0.08] text-xs font-mono text-white shrink-0">
+                          <Clock className="w-3.5 h-3.5 text-[#4589ff]" />
+                          Starts in {daysLeft}d {hoursLeft}h {minsLeft}m
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Single 3-Step Progress Bar: Setup ✓ -> Leads added ✓ -> Reminders running */}
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="h-1.5 rounded-full bg-[#4589ff]" />
+                        <div
+                          className={`h-1.5 rounded-full ${
+                            totalRegCount > 0 ? "bg-[#4589ff]" : "bg-[#25272c]"
+                          }`}
+                        />
+                        <div
+                          className={`h-1.5 rounded-full ${
+                            activeEvent.is_paid !== false
+                              ? "bg-emerald-400"
+                              : "bg-amber-400"
+                          }`}
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 text-[11px] font-medium text-[#9ca3af]">
+                        <span className="text-white">✓ Setup complete</span>
+                        <span className={totalRegCount > 0 ? "text-white" : ""}>
+                          {totalRegCount > 0
+                            ? `✓ Leads added (${totalRegCount})`
+                            : "○ Add leads"}
+                        </span>
+                        <span
+                          className={
+                            activeEvent.is_paid !== false
+                              ? "text-emerald-400"
+                              : "text-amber-300"
+                          }
+                        >
+                          {activeEvent.is_paid !== false
+                            ? "● Reminders running"
+                            : "⏳ Ready to launch (Unpaid)"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* The 4 Core Numbers */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        {
+                          value: totalRegCount,
+                          label: "registered",
+                          highlight: false,
+                        },
+                        {
+                          value: deliveredCount,
+                          label: "delivered",
+                          highlight: false,
+                        },
+                        {
+                          value: confirmedImInCount,
+                          label: '"I\'m in"',
+                          highlight: false,
+                        },
+                        {
+                          value:
+                            trackerView === "live_window" || attendedCount > 0
+                              ? attendedCount
+                              : "—",
+                          label: "joined live",
+                          highlight: trackerView === "live_window",
+                        },
+                      ].map((stat) => (
+                        <div
+                          key={stat.label}
+                          className={`p-4 rounded-2xl border text-center ${
+                            stat.highlight
+                              ? "bg-[#4589ff]/15 border-[#4589ff]/40"
+                              : "bg-[#25272c]/70 border-white/[0.06]"
+                          }`}
+                        >
+                          <div className="font-mono tracking-tight text-2xl sm:text-3xl font-medium text-white">
+                            {stat.value}
+                          </div>
+                          <div className="text-xs text-[#9ca3af] mt-1">
+                            {stat.label}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Single 👉 NEXT Action Card (Always One Clear Action) */}
+                    {activeEvent.is_paid === false ? (
+                      <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="text-xs sm:text-sm font-medium text-white">
+                            👉 NEXT: Activate your 5-stage WhatsApp reminders
+                          </div>
+                          <div className="text-xs text-[#9ca3af]">
+                            {totalRegCount} leads are loaded. Pay KES 1,500 via
+                            M-Pesa to start their automated sequence.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWizardInitialEvent(activeEvent);
+                            setTrackerView("wizard");
+                          }}
+                          className="px-5 py-2.5 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-xs font-medium text-white shrink-0 transition"
+                        >
+                          Pay KES 1,500 &amp; Launch →
+                        </button>
+                      </div>
+                    ) : trackerView === "live_window" ? (
+                      <div className="p-5 rounded-2xl bg-[#4589ff]/15 border border-[#4589ff]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="text-xs sm:text-sm font-medium text-white">
+                            🔴 Your room is live! Stage 5 join links have been
+                            dispatched.
+                          </div>
+                          <div className="text-xs text-[#9ca3af]">
+                            When your webinar ends, view your attendance lift
+                            and ROI report.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setTrackerView("finished")}
+                          className="px-5 py-2.5 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-xs font-medium text-white shrink-0 transition"
+                        >
+                          Complete &amp; View Results →
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-5 rounded-2xl bg-[#25272c] border border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="text-xs sm:text-sm font-medium text-white">
+                            👉 NEXT: Share your page to get more registrations
+                          </div>
+                          <div className="text-xs font-mono text-[#4589ff]">
+                            {originUrl}/r/{activeEvent.slug}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyText(
+                                "nextRegUrl",
+                                `${originUrl}/r/${activeEvent.slug}`
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-xs font-medium text-white transition"
+                          >
+                            {copiedKey === "nextRegUrl" ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" />
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5" />
+                                Copy link
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setWizardInitialEvent(activeEvent);
+                              setTrackerView("wizard");
+                            }}
+                            className="px-4 py-2.5 rounded-full bg-[#17191e] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-white transition"
+                          >
+                            + Add list
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Clean 5-Stage Vertical Timeline */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-sm font-medium text-white">
+                          5-Stage WhatsApp Timeline
+                        </h2>
+                        <span className="text-[11px] font-mono text-[#8a909e]">
+                          East Africa Time (EAT)
+                        </span>
+                      </div>
+
+                      <div className="divide-y divide-white/[0.06] rounded-2xl bg-[#101114] border border-white/[0.06] overflow-hidden">
+                        {STAGES_META.map((st) => {
+                          const stageMsgs = eventMessages.filter(
+                            (m) => m.stage === st.key
+                          );
+                          const sentCount = stageMsgs.filter((m) =>
+                            ["sent", "delivered", "read"].includes(m.status)
+                          ).length;
+
+                          const isDone =
+                            st.step <= 2 ||
+                            sentCount > 0 ||
+                            (trackerView === "live_window" && st.step <= 5);
+                          const isNext = !isDone && st.step === 3;
+
+                          return (
+                            <div
+                              key={st.key}
+                              className="px-4 py-3.5 flex items-center justify-between gap-3 text-xs"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center font-mono text-[11px] ${
+                                    isDone
+                                      ? "bg-emerald-500/15 text-emerald-400"
+                                      : isNext
+                                      ? "bg-[#4589ff]/20 text-[#4589ff]"
+                                      : "bg-[#25272c] text-[#8a909e]"
+                                  }`}
+                                >
+                                  {isDone ? "✓" : isNext ? "⏳" : "○"}
+                                </span>
+                                <div>
+                                  <span className="font-medium text-white">
+                                    {st.label}
+                                  </span>
+                                  <span className="text-[#8a909e] ml-2">
+                                    · {st.timing}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <span className="text-[11px] font-mono text-[#8a909e]">
+                                  {isDone
+                                    ? `${Math.max(sentCount, totalRegCount)} sent`
+                                    : "Scheduled"}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={dispatchingStage === st.key}
+                                  onClick={() => handleFireStageNow(st.key)}
+                                  className="text-[11px] text-[#4589ff] hover:underline inline-flex items-center gap-1"
+                                  title="Trigger this stage immediately for demo/testing"
+                                >
+                                  {dispatchingStage === st.key ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Play className="w-3 h-3" />
+                                  )}
+                                  Send now
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Footer Actions of Tracker Card */}
+                    <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06]">
+                      <button
+                        type="button"
+                        onClick={() => setShowLeadsDrawer((v) => !v)}
+                        className="inline-flex items-center gap-1.5 text-xs text-[#9ca3af] hover:text-white transition"
+                      >
+                        <Users className="w-3.5 h-3.5 text-[#4589ff]" />
+                        {showLeadsDrawer
+                          ? "Hide registrants list"
+                          : `View or add registrants (${totalRegCount})`}
+                        {showLeadsDrawer ? (
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={sendingPreview}
+                        onClick={handleSendSelfPreview}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#25272c] hover:bg-[#2f3238] text-xs font-medium text-white transition"
+                      >
+                        {sendingPreview ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5 text-[#4589ff]" />
+                        )}
+                        Send myself a preview
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Collapsible Registrants & Quick Add Drawer (Progressive Disclosure) */}
+                  {showLeadsDrawer && (
+                    <div className="bg-[#17191e] border border-white/[0.08] rounded-3xl p-6 space-y-5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="text-sm font-medium text-white">
+                          Registrants ({totalRegCount})
+                        </h3>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSampleCsvImport("registrants")}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#25272c] text-xs text-white"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-[#4589ff]" />
+                            Load sample CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDownloadAttendeesCsv}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#25272c] text-xs text-white"
+                          >
+                            <Download className="w-3.5 h-3.5 text-[#4589ff]" />
+                            Export CSV
+                          </button>
+                        </div>
+                      </div>
+
+                      <form
+                        onSubmit={handleQuickAddRegistrant}
+                        className="grid grid-cols-1 sm:grid-cols-12 gap-2.5"
+                      >
+                        <input
+                          type="text"
+                          required
+                          placeholder="Full Name (e.g. Jane Wanjiru)"
+                          value={quickName}
+                          onChange={(e) => setQuickName(e.target.value)}
+                          className="sm:col-span-5 px-4 py-2.5 rounded-full bg-[#25272c] border border-white/[0.08] text-xs text-white"
+                        />
+                        <input
+                          type="tel"
+                          required
+                          placeholder="0712 345 678"
+                          value={quickPhone}
+                          onChange={(e) => setQuickPhone(e.target.value)}
+                          className="sm:col-span-4 px-4 py-2.5 rounded-full bg-[#25272c] border border-white/[0.08] text-xs text-white font-mono"
+                        />
+                        <button
+                          type="submit"
+                          disabled={addingLead}
+                          className="sm:col-span-3 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-white font-medium text-xs"
+                        >
+                          {addingLead ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Plus className="w-3.5 h-3.5" />
+                          )}
+                          Add person
+                        </button>
+                      </form>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="border-b border-white/[0.08] text-[#8a909e]">
+                              <th className="py-2.5 px-3">Name</th>
+                              <th className="py-2.5 px-3">WhatsApp</th>
+                              <th className="py-2.5 px-3">Personal Join Link</th>
+                              <th className="py-2.5 px-3">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/[0.06]">
+                            {eventRegistrants.map((reg) => (
+                              <tr key={reg.id}>
+                                <td className="py-2.5 px-3 font-medium text-white">
+                                  {reg.full_name}
+                                </td>
+                                <td className="py-2.5 px-3 font-mono text-[#9ca3af]">
+                                  {formatPhoneDisplay(reg.phone_e164)}
+                                </td>
+                                <td className="py-2.5 px-3">
+                                  <a
+                                    href={`/j/${reg.tracking_token}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    onClick={() =>
+                                      setTimeout(loadWorkspace, 1000)
+                                    }
+                                    className="font-mono text-[#4589ff] hover:underline inline-flex items-center gap-1"
+                                  >
+                                    /j/{reg.tracking_token}
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </td>
+                                <td className="py-2.5 px-3">
+                                  {reg.clicked_join_link || reg.zoom_verified ? (
+                                    <span className="text-emerald-400 font-medium">
+                                      ✓ Joined live
+                                    </span>
+                                  ) : (
+                                    <span className="text-[#8a909e]">
+                                      Reminded
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            {/* ========================================================= */}
+            {/* STATE C: FINISHED EVENT (Results + Post-Event ROI Card)   */}
+            {/* ========================================================= */}
+            {trackerView === "finished" && activeEvent && (
+              <div className="space-y-6">
+                <div className="bg-[#17191e] border border-white/[0.08] rounded-3xl p-6 sm:p-9 space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-medium">
+                      ✓ Webinar Completed
+                    </span>
+                    <span className="text-xs font-mono text-[#8a909e]">
+                      {formatEatDate(activeEvent.starts_at).fullStr}
+                    </span>
+                  </div>
+
+                  {/* Result Headline */}
+                  <div className="space-y-2">
+                    <div className="text-xs text-[#9ca3af]">
+                      {activeEvent.title}
+                    </div>
+                    <h1 className="text-3xl sm:text-5xl font-medium tracking-[-0.035em] text-white">
+                      {totalRegCount} registered → {attendedCount} showed up (
+                      <span className="text-[#4589ff]">{liveShowupPct}%</span>)
+                    </h1>
+                    <p className="text-sm sm:text-base text-[#9ca3af]">
+                      Industry email/SMS average in Kenya is 15–20%.{" "}
+                      <strong className="text-white">
+                        That&apos;s +{extraAttendeesCount} extra attendees you
+                        wouldn&apos;t have had in your room.
+                      </strong>
+                    </p>
+                  </div>
+
+                  {/* Two Primary Post-Event CTAs */}
+                  <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleDuplicateWebinar}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-white font-medium text-sm px-7 py-3.5 transition"
+                    >
+                      Run another webinar (duplicate this one)
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadAttendeesCsv}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-[#25272c] hover:bg-[#2f3238] text-white font-medium text-sm px-6 py-3.5 transition"
+                    >
+                      <Download className="w-4 h-4 text-[#4589ff]" />
+                      Download attendee list
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSampleCsvImport("attendance_reconcile")
+                      }
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-[#101114] border border-white/[0.08] hover:bg-[#25272c] text-xs text-[#9ca3af] hover:text-white px-4 py-3.5 transition"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-[#4589ff]" />
+                      Reconcile Zoom CSV
+                    </button>
+                  </div>
+
+                  {/* Embedded Post-Event ROI Calculator (Fed by real attendance data) */}
+                  <div className="pt-6 border-t border-white/[0.08] space-y-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-base font-medium text-white flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-[#4589ff]" />
+                          Your Real Webinar ROI Breakdown
+                        </h2>
+                        <p className="text-xs text-[#8a909e]">
+                          Calculated from your {attendedCount} verified live
+                          attendees vs {baselinePct}% email baseline.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-4 rounded-2xl bg-[#25272c] border border-white/[0.06]">
+                        <div className="text-xs text-[#8a909e]">
+                          Cost per live attendee
+                        </div>
+                        <div className="font-mono text-2xl font-medium text-white mt-1">
+                          KES {costPerAttendeeKes.toLocaleString()}
+                        </div>
+                        <div className="text-[11px] text-[#8a909e] mt-1">
+                          Down from{" "}
+                          <span className="line-through text-red-400">
+                            KES {costPerAttendeeBeforeKes.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-[#25272c] border border-white/[0.06]">
+                        <div className="text-xs text-[#8a909e]">
+                          Extra people in the room
+                        </div>
+                        <div className="font-mono text-2xl font-medium text-emerald-400 mt-1">
+                          +{extraAttendeesCount} attendees
+                        </div>
+                        <div className="text-[11px] text-[#8a909e] mt-1">
+                          vs {baselineAttendeesCount} with email/SMS
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-[#4589ff]/15 border border-[#4589ff]/40">
+                        <div className="text-xs text-[#7db4ff]">
+                          Estimated extra sales
+                        </div>
+                        <div className="font-mono text-2xl font-medium text-white mt-1">
+                          +KES {extraRevenueKes.toLocaleString()}
+                        </div>
+                        <div className="text-[11px] text-[#9ca3af] mt-1">
+                          From KES 1,500 ShowUp pass
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Adjustable inputs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                      <div>
+                        <label className="block text-[11px] text-[#8a909e] mb-1 ml-3">
+                          Your ad spend (KES)
+                        </label>
+                        <input
+                          type="number"
+                          value={roiAdSpend}
+                          onChange={(e) =>
+                            setRoiAdSpend(Number(e.target.value) || 0)
+                          }
+                          className="w-full px-4 py-2.5 rounded-full bg-[#101114] border border-white/[0.08] text-xs font-mono text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-[#8a909e] mb-1 ml-3">
+                          Your offer price (KES)
+                        </label>
+                        <input
+                          type="number"
+                          value={roiOfferPrice}
+                          onChange={(e) =>
+                            setRoiOfferPrice(Number(e.target.value) || 0)
+                          }
+                          className="w-full px-4 py-2.5 rounded-full bg-[#101114] border border-white/[0.08] text-xs font-mono text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-[#8a909e] mb-1 ml-3">
+                          Close rate (%)
+                        </label>
+                        <input
+                          type="number"
+                          value={roiCloseRate}
+                          onChange={(e) =>
+                            setRoiCloseRate(Number(e.target.value) || 5)
+                          }
+                          className="w-full px-4 py-2.5 rounded-full bg-[#101114] border border-white/[0.08] text-xs font-mono text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ========================================================= */}
+        {/* ACCOUNT VIEW (Deferred Plumbing & Progressive Disclosure) */}
+        {/* ========================================================= */}
+        {topNav === "account" && (
+          <div className="space-y-6">
+            {/* 1. Custom Brand Sender Upgrade (Own WABA) */}
+            <div className="bg-[#17191e] border border-white/[0.08] rounded-3xl p-6 sm:p-8 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-electric-hover" />
-                    Create Custom Event Template
-                  </h3>
-                  <p className="text-xs text-[#94a3b8]">
-                    Write custom copy with dynamic variables (<code className="text-[#7db4ff]">&#123;&#123;1&#125;&#125;</code> = First Name, <code className="text-[#7db4ff]">&#123;&#123;2&#125;&#125;</code> = Event Title, <code className="text-[#7db4ff]">&#123;&#123;3&#125;&#125;</code> = Time/Link).
+                  <span className="text-xs text-[#4589ff] font-medium">
+                    Sender Identity
+                  </span>
+                  <h2 className="text-xl font-medium text-white mt-0.5">
+                    Send reminders from your own business number
+                  </h2>
+                  <p className="text-xs text-[#8a909e] mt-1">
+                    By default, ShowUp sends instantly from our verified number.
+                    Connect your own WhatsApp Business Account anytime so
+                    messages come directly from your brand.
                   </p>
                 </div>
 
-                <form onSubmit={handleCreateCustomTemplate} className="space-y-3.5">
-                  <div>
-                    <label className="block text-xs text-[#94a3b8] mb-1">
-                      Template Name (snake_case)
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. forex_vip_countdown_1h"
-                      value={customTplName}
-                      onChange={(e) => setCustomTplName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white font-mono"
-                    />
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    tenant.waba_status === "connected"
+                      ? "bg-emerald-500/15 text-emerald-400"
+                      : "bg-[#25272c] text-[#9ca3af]"
+                  }`}
+                >
+                  {tenant.waba_status === "connected"
+                    ? `Connected (${tenant.display_phone_number || tenant.phone_number_id})`
+                    : "Using ShowUp Shared Number"}
+                </span>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEmbeddedModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#25272c] hover:bg-[#2f3238] text-xs font-medium text-white transition"
+                >
+                  <Smartphone className="w-4 h-4 text-[#4589ff]" />
+                  {tenant.waba_status === "connected"
+                    ? "Manage Official WhatsApp Connection"
+                    : "Connect My Own Business Number (Meta Embedded Signup)"}
+                </button>
+              </div>
+            </div>
+
+            {/* 2. M-Pesa Payment Receipts */}
+            <div className="bg-[#17191e] border border-white/[0.08] rounded-3xl p-6 sm:p-8 space-y-4">
+              <h2 className="text-lg font-medium text-white">
+                M-Pesa Receipts &amp; Event Passes
+              </h2>
+              {payments.length === 0 ? (
+                <p className="text-xs text-[#8a909e]">
+                  No M-Pesa payments yet. You only pay when you launch a
+                  webinar.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {payments.map((p) => (
+                    <div
+                      key={p.id}
+                      className="p-4 rounded-2xl bg-[#101114] border border-white/[0.06] flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <span className="font-medium text-white uppercase">
+                          {p.plan_tier.replace("_", " ")}
+                        </span>{" "}
+                        ·{" "}
+                        <span className="font-mono text-[#4589ff]">
+                          {p.mpesa_receipt}
+                        </span>
+                      </div>
+                      <div className="font-mono text-[#9ca3af]">
+                        KES {p.amount_kes.toLocaleString()} (+{p.phone_e164})
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Progressive Disclosure: Advanced Templates & Webhooks */}
+            <div className="bg-[#17191e] border border-white/[0.08] rounded-3xl p-6 sm:p-8 space-y-4">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedAccount((v) => !v)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <div>
+                  <h2 className="text-base font-medium text-white">
+                    Advanced: Customize Message Templates &amp; Webhooks
+                  </h2>
+                  <p className="text-xs text-[#8a909e]">
+                    Optional tools for power hosts running custom Meta templates
+                    or external webhooks.
+                  </p>
+                </div>
+                {showAdvancedAccount ? (
+                  <ChevronUp className="w-4 h-4 text-[#8a909e]" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-[#8a909e]" />
+                )}
+              </button>
+
+              {showAdvancedAccount && (
+                <div className="pt-4 border-t border-white/[0.08] space-y-6">
+                  {/* Webhook & DB Info */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-4 rounded-2xl bg-[#101114] border border-white/[0.06] space-y-1">
+                      <div className="text-[#8a909e]">Meta Webhook URL</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-[#4589ff] truncate">
+                          {originUrl}/api/webhooks/meta
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyText("whMeta", `${originUrl}/api/webhooks/meta`)
+                          }
+                          className="text-white underline"
+                        >
+                          {copiedKey === "whMeta" ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-[#101114] border border-white/[0.06] flex items-center justify-between">
+                      <div>
+                        <div className="text-white font-medium flex items-center gap-1.5">
+                          <Database className="w-3.5 h-3.5 text-[#4589ff]" />
+                          Persistence Engine
+                        </div>
+                        <div className="text-[11px] text-[#8a909e]">
+                          {supabaseReady
+                            ? "Supabase Cloud Connected"
+                            : "Local JSON Persistence Active"}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={loadWorkspace}
+                        className="p-2 rounded-full bg-[#25272c] text-white"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-[#94a3b8] mb-1">
-                        Meta Category
-                      </label>
+                  {/* Custom Template Form */}
+                  <form
+                    onSubmit={handleCreateCustomTemplate}
+                    className="p-5 rounded-2xl bg-[#101114] border border-white/[0.06] space-y-3 text-xs"
+                  >
+                    <div className="font-medium text-white flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#4589ff]" />
+                      Create Custom Meta Template ({templates.length} active)
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <input
+                        type="text"
+                        required
+                        placeholder="template_name_snake_case"
+                        value={customTplName}
+                        onChange={(e) => setCustomTplName(e.target.value)}
+                        className="px-3.5 py-2 rounded-full bg-[#17191e] border border-white/[0.08] text-white font-mono"
+                      />
                       <select
                         value={customTplCategory}
                         onChange={(e) =>
@@ -1049,16 +1442,11 @@ export default function DashboardPage() {
                             e.target.value as "UTILITY" | "MARKETING"
                           )
                         }
-                        className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
+                        className="px-3.5 py-2 rounded-full bg-[#17191e] border border-white/[0.08] text-white"
                       >
-                        <option value="UTILITY">UTILITY (Lower Fee)</option>
-                        <option value="MARKETING">MARKETING (Promotional)</option>
+                        <option value="UTILITY">UTILITY</option>
+                        <option value="MARKETING">MARKETING</option>
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-[#94a3b8] mb-1">
-                        Target Stage
-                      </label>
                       <select
                         value={customTplStage}
                         onChange={(e) =>
@@ -1066,317 +1454,50 @@ export default function DashboardPage() {
                             e.target.value as SequenceStage | "custom"
                           )
                         }
-                        className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
+                        className="px-3.5 py-2 rounded-full bg-[#17191e] border border-white/[0.08] text-white"
                       >
-                        <option value="instant_welcome">Stage 1: Instant Welcome</option>
-                        <option value="calendar_link">Stage 2: Calendar Link</option>
-                        <option value="t_24h">Stage 3: T-24h Teaser</option>
-                        <option value="t_1h">Stage 4: T-1h Countdown</option>
-                        <option value="live_now">Stage 5: Live Now Link</option>
+                        <option value="instant_welcome">Stage 1: Welcome</option>
+                        <option value="calendar_link">Stage 2: Calendar</option>
+                        <option value="t_24h">Stage 3: 24h Reminder</option>
+                        <option value="t_1h">Stage 4: 1h Countdown</option>
+                        <option value="live_now">Stage 5: Live Link</option>
                       </select>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-[#94a3b8] mb-1">
-                      Message Body
-                    </label>
                     <textarea
-                      rows={4}
-                      required
+                      rows={3}
                       value={customTplBody}
                       onChange={(e) => setCustomTplBody(e.target.value)}
-                      className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white"
+                      className="w-full p-3.5 rounded-2xl bg-[#17191e] border border-white/[0.08] text-white"
                     />
-                  </div>
-
-                  {/* Live Handset Bubble Preview */}
-                  <div className="p-3.5 rounded-xl bg-[#0b141a] border border-electric/30 space-y-1">
-                    <div className="text-[10px] text-electric-hover uppercase font-bold">
-                      Live WhatsApp Handset Preview
-                    </div>
-                    <div className="text-xs text-slate-200 whitespace-pre-wrap">
-                      {renderTemplatePreview(customTplBody, [
-                        "Wanjiku",
-                        activeEvent?.title || "Masterclass",
-                        "7:00 PM",
-                        activeEvent?.host_name || "Brian",
-                        activeEvent?.teaser_hook || "key strategies",
-                      ])}
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={creatingTemplate}
-                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-electric hover:bg-electric-hover text-white font-bold text-xs transition"
-                  >
-                    {creatingTemplate ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
-                    )}
-                    Submit Template to Meta &amp; Save
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: META EMBEDDED SIGNUP & WEBHOOKS CONFIGURATION */}
-        {activeTab === "whatsapp" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left: Embedded Signup Card */}
-              <div className="bg-surface border border-white/[0.08] rounded-2xl p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Smartphone className="w-5 h-5 text-electric-hover" />
-                    Meta Embedded Signup Status
-                  </h3>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-electric-subtle text-[#7db4ff] border border-electric/30 font-mono">
-                    Config ID: {metaConfigId}
-                  </span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-canvas border border-white/[0.08] space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-[#94a3b8]">Connection State:</span>
-                    <span className="font-bold text-electric-hover uppercase">
-                      {tenant.waba_status}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#94a3b8]">Client WABA ID:</span>
-                    <code className="text-slate-200">
-                      {tenant.waba_id || "Not connected yet"}
-                    </code>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#94a3b8]">Phone Number ID:</span>
-                    <code className="text-slate-200">
-                      {tenant.phone_number_id || "Not connected yet"}
-                    </code>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#94a3b8]">Display Phone:</span>
-                    <span className="text-slate-200 font-semibold">
-                      {tenant.display_phone_number || "—"}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setIsEmbeddedModalOpen(true)}
-                  className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-electric hover:bg-electric-hover text-white font-bold text-xs transition"
-                >
-                  <Smartphone className="w-4 h-4" />
-                  Open Meta Embedded Signup Modal
-                </button>
-              </div>
-
-              {/* Right: Webhook & Database Status */}
-              <div className="bg-surface border border-white/[0.08] rounded-2xl p-6 space-y-4">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Database className="w-5 h-5 text-electric-hover" />
-                  Meta Webhook &amp; Supabase Database Status
-                </h3>
-
-                <div className="space-y-3 text-xs">
-                  <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] space-y-1">
-                    <div className="text-[#94a3b8]">
-                      Meta Webhook Callback URL (Paste in Meta Portal → WhatsApp →
-                      Configuration):
-                    </div>
-                    <div className="flex items-center justify-between gap-2 pt-1">
-                      <code className="text-[#7db4ff] break-all">
-                        {originUrl}/api/webhooks/meta
-                      </code>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-[#8a909e]">
+                        Preview:{" "}
+                        {renderTemplatePreview(customTplBody, [
+                          "Wanjiku",
+                          activeEvent?.title || "Masterclass",
+                          "7:00 PM",
+                          "Brian",
+                          "key strategies",
+                        ]).slice(0, 60)}
+                        ...
+                      </span>
                       <button
-                        onClick={() =>
-                          copyText("metaWh", `${originUrl}/api/webhooks/meta`)
-                        }
-                        className="text-electric-hover underline shrink-0"
+                        type="submit"
+                        disabled={creatingTemplate}
+                        className="px-4 py-2 rounded-full bg-[#4589ff] text-white font-medium"
                       >
-                        {copiedKey === "metaWh" ? "Copied" : "Copy"}
+                        {creatingTemplate ? "Saving..." : "Save Template"}
                       </button>
                     </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] space-y-1">
-                    <div className="text-[#94a3b8]">Meta Webhook Verify Token:</div>
-                    <div className="flex items-center justify-between gap-2 pt-1">
-                      <code className="text-[#7db4ff]">
-                        showup_secret_verify_token_2026
-                      </code>
-                      <button
-                        onClick={() =>
-                          copyText("verifyTok", "showup_secret_verify_token_2026")
-                        }
-                        className="text-electric-hover underline shrink-0"
-                      >
-                        {copiedKey === "verifyTok" ? "Copied" : "Copy"}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] flex items-center justify-between">
-                    <div>
-                      <div className="text-white font-semibold">
-                        Supabase Storage Engine
-                      </div>
-                      <div className="text-[11px] text-[#94a3b8]">
-                        {supabaseReady
-                          ? "Connected to live `showup_*` tables in Supabase"
-                          : "Running on resilient local persistence (Run migration SQL in Supabase SQL Editor to sync cloud tables)"}
-                      </div>
-                    </div>
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                        supabaseReady
-                          ? "bg-electric-subtle text-[#7db4ff]"
-                          : "bg-amber-500/15 text-amber-300"
-                      }`}
-                    >
-                      {supabaseReady ? "Cloud Active" : "Local Persistence Active"}
-                    </span>
-                  </div>
+                  </form>
                 </div>
-              </div>
+              )}
             </div>
-          </div>
-        )}
-
-        {/* TAB 4: M-PESA BILLING & SUBSCRIPTION UPGRADE */}
-        {activeTab === "billing" && (
-          <div className="space-y-6">
-            <div className="bg-surface border border-white/[0.08] rounded-2xl p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-bold text-white">
-                    M-Pesa STK Push Subscription Billing
-                  </h2>
-                  <p className="text-xs text-[#94a3b8]">
-                    Clients pay Meta directly for their tiny Utility conversation fees, and
-                    pay your monthly SaaS subscription via M-Pesa STK Push.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-[#94a3b8]">M-Pesa Number:</label>
-                  <input
-                    type="tel"
-                    value={mpesaPhone}
-                    onChange={(e) => setMpesaPhone(e.target.value)}
-                    placeholder="0712 345 678"
-                    className="px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-xs text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
-                <div className="p-5 rounded-2xl bg-canvas border border-white/[0.08] flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="text-xs font-bold text-[#94a3b8] uppercase">
-                      Free Pilot Tier
-                    </div>
-                    <div className="text-2xl font-extrabold text-white">Ksh 0</div>
-                    <p className="text-xs text-[#94a3b8]">
-                      Up to 100 registrants on your first live webinar to prove the
-                      attendance jump.
-                    </p>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-white/[0.08] text-xs text-electric-hover font-semibold">
-                    {tenant.plan_tier === "pilot" ? "✓ Current Plan" : "Included"}
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-canvas border-2 border-electric flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="text-xs font-bold text-electric-hover uppercase">
-                      Starter Tier
-                    </div>
-                    <div className="text-2xl font-extrabold text-white">
-                      Ksh 4,999 <span className="text-xs font-normal text-[#94a3b8]">/mo</span>
-                    </div>
-                    <p className="text-xs text-[#94a3b8]">
-                      Up to 500 registrants/month, unlimited webinars, Template Studio, and
-                      ROI reports.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleMpesaUpgrade("starter")}
-                    disabled={processingMpesa !== null}
-                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-electric hover:bg-electric-hover text-white font-bold text-xs transition"
-                  >
-                    {processingMpesa === "starter" ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CreditCard className="w-4 h-4" />
-                    )}
-                    {tenant.plan_tier === "starter"
-                      ? "Renew Starter via M-Pesa"
-                      : "Pay Ksh 4,999 via M-Pesa STK"}
-                  </button>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-canvas border border-white/[0.08] flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="text-xs font-bold text-[#94a3b8] uppercase">
-                      Pro Scale Tier
-                    </div>
-                    <div className="text-2xl font-extrabold text-white">
-                      Ksh 9,999 <span className="text-xs font-normal text-[#94a3b8]">/mo</span>
-                    </div>
-                    <p className="text-xs text-[#94a3b8]">
-                      Up to 2,000 registrants/month for high-volume academies and training
-                      companies.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleMpesaUpgrade("pro")}
-                    disabled={processingMpesa !== null}
-                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-electric/30 hover:bg-electric/20 text-[#7db4ff] font-bold text-xs transition"
-                  >
-                    {processingMpesa === "pro" ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CreditCard className="w-4 h-4" />
-                    )}
-                    Pay Ksh 9,999 via M-Pesa STK
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {payments.length > 0 && (
-              <div className="bg-surface border border-white/[0.07] rounded-3xl p-6 space-y-3">
-                <h3 className="text-sm font-bold text-white">M-Pesa Receipt History</h3>
-                <div className="space-y-2">
-                  {payments.map((p) => (
-                    <div
-                      key={p.id}
-                      className="p-3 rounded-xl bg-canvas border border-white/[0.08] flex items-center justify-between text-xs"
-                    >
-                      <div>
-                        <span className="font-bold text-white uppercase">
-                          {p.plan_tier} Plan
-                        </span>{" "}
-                        • <span className="text-electric-hover font-mono">{p.mpesa_receipt}</span>
-                      </div>
-                      <div className="text-[#94a3b8]">
-                        Ksh {p.amount_kes.toLocaleString()} (+{p.phone_e164})
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </main>
 
-      {/* MODAL 1: META EMBEDDED SIGNUP */}
+      {/* META EMBEDDED SIGNUP MODAL (Only opened when host chooses to connect their own business number) */}
       <EmbeddedSignupModal
         isOpen={isEmbeddedModalOpen}
         onClose={() => setIsEmbeddedModalOpen(false)}
@@ -1391,183 +1512,6 @@ export default function DashboardPage() {
           loadWorkspace();
         }}
       />
-
-      {/* MODAL 2: POST-WEBINAR ROI REPORT */}
-      {activeEvent && (
-        <RoiReportModal
-          isOpen={isRoiModalOpen}
-          onClose={() => setIsRoiModalOpen(false)}
-          event={activeEvent}
-          registrants={eventRegistrants}
-          messages={eventMessages}
-        />
-      )}
-
-      {/* MODAL 3: CREATE NEW WEBINAR */}
-      {isNewEventModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-surface border border-white/[0.08] rounded-2xl max-w-2xl w-full p-6 space-y-5 my-8">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-              <h3 className="text-lg font-bold text-white">
-                Create New Webinar &amp; Configure 5-Stage Sequence
-              </h3>
-              <button
-                onClick={() => setIsNewEventModalOpen(false)}
-                className="text-[#94a3b8] hover:text-white text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateEvent} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[#94a3b8] mb-1">Webinar Title *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Forex & Gold Trading Masterclass"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[#94a3b8] mb-1">Host / Trainer Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newHostName}
-                    onChange={(e) => setNewHostName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[#94a3b8] mb-1">
-                    Start Date &amp; Time (EAT) *
-                  </label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={newStartsAt}
-                    onChange={(e) => setNewStartsAt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[#94a3b8] mb-1">
-                    Zoom / Google Meet / YouTube Live URL *
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    value={newJoinUrl}
-                    onChange={(e) => setNewJoinUrl(e.target.value)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[#94a3b8] mb-1">
-                  T-24h Value Hook (Sent 24 hours before start: &ldquo;In this session, Host
-                  will show you...&rdquo;)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newTeaserHook}
-                  onChange={(e) => setNewTeaserHook(e.target.value)}
-                  className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
-                />
-              </div>
-
-              {/* Template Assignment per Stage */}
-              <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] space-y-2.5">
-                <div className="font-semibold text-electric-hover">
-                  Assign Templates for Each Stage (Default Pre-Approved or Custom):
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {STAGES_META.map((st) => (
-                    <div key={st.key}>
-                      <label className="block text-[11px] text-[#94a3b8] mb-0.5">
-                        Stage {st.step}: {st.label}
-                      </label>
-                      <select
-                        value={stageTplMap[st.key]}
-                        onChange={(e) =>
-                          setStageTplMap((prev) => ({
-                            ...prev,
-                            [st.key]: e.target.value,
-                          }))
-                        }
-                        className="w-full px-2.5 py-1.5 rounded-full bg-surface border border-white/[0.08] text-white"
-                      >
-                        {templates.map((t) => (
-                          <option key={t.id} value={t.name}>
-                            {t.name} ({t.category})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[#94a3b8] mb-1">Ad Spend (Ksh)</label>
-                  <input
-                    type="number"
-                    value={newAdSpend}
-                    onChange={(e) => setNewAdSpend(Number(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[#94a3b8] mb-1">Past Baseline %</label>
-                  <input
-                    type="number"
-                    value={newBaselinePct}
-                    onChange={(e) => setNewBaselinePct(Number(e.target.value) || 20)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[#94a3b8] mb-1">Offer Price (Ksh)</label>
-                  <input
-                    type="number"
-                    value={newOfferPrice}
-                    onChange={(e) => setNewOfferPrice(Number(e.target.value) || 25000)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsNewEventModalOpen(false)}
-                  className="px-4 py-2 rounded-full border border-white/[0.08] text-[#94a3b8]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creatingEvent}
-                  className="px-6 py-2 rounded-full bg-electric hover:bg-electric-hover text-white font-bold"
-                >
-                  {creatingEvent ? "Creating..." : "Create Webinar & Generate Funnel"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-

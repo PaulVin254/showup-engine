@@ -23,6 +23,9 @@ export async function POST(req: Request) {
       baselineShowupRate = 20,
       offerPriceKes = 25000,
       expectedCloseRate = 5,
+      isPaid = false,
+      senderMode = "shared_showup",
+      eventId,
     } = body;
 
     if (!title || !startsAt || !joinUrl) {
@@ -66,10 +69,27 @@ export async function POST(req: Request) {
       offer_price_kes: Number(offerPriceKes) || 25000,
       expected_close_rate: Number(expectedCloseRate) || 5,
       status: "upcoming",
+      is_paid: Boolean(isPaid),
+      sender_mode: senderMode === "own_waba" ? "own_waba" : "shared_showup",
       created_at: new Date().toISOString(),
     };
 
     if (supabaseReady && supabase) {
+      if (eventId) {
+        const { data, error } = await supabase
+          .from("showup_events")
+          .update({
+            title: newEvent.title,
+            host_name: newEvent.host_name,
+            teaser_hook: newEvent.teaser_hook,
+            starts_at: newEvent.starts_at,
+            join_url: newEvent.join_url,
+          })
+          .eq("id", eventId)
+          .select("*")
+          .single();
+        if (!error && data) return NextResponse.json({ event: data });
+      }
       const { data, error } = await supabase
         .from("showup_events")
         .insert(newEvent)
@@ -81,6 +101,22 @@ export async function POST(req: Request) {
     }
 
     const db = readLocalDb();
+    if (eventId) {
+      const existingIdx = db.events.findIndex((e) => e.id === eventId);
+      if (existingIdx >= 0) {
+        db.events[existingIdx] = {
+          ...db.events[existingIdx],
+          title: newEvent.title,
+          host_name: newEvent.host_name,
+          teaser_hook: newEvent.teaser_hook,
+          starts_at: newEvent.starts_at,
+          join_url: newEvent.join_url,
+          sender_mode: newEvent.sender_mode,
+        };
+        writeLocalDb(db);
+        return NextResponse.json({ event: db.events[existingIdx] });
+      }
+    }
     db.events.unshift(newEvent);
     writeLocalDb(db);
 

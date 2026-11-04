@@ -83,6 +83,10 @@ function createInitialSeed(): LocalDbSchema {
     offer_price_kes: 25000,
     expected_close_rate: 6,
     status: "upcoming",
+    is_paid: true,
+    sender_mode: "shared_showup",
+    paid_pass_tier: "event_pass",
+    mpesa_receipt: "SJK9402KLA",
     created_at: now.toISOString(),
   };
 

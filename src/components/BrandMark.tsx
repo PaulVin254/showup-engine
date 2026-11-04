@@ -1,80 +1,97 @@
 import React from "react";
 
 /**
- * Free-floating calligraphic electric-blue ribbon mark in the exact spirit of Meta Muse.
- * Never wrapped in a bordered square container.
+ * Kenyan-inspired free-floating 3D tactile mark in the Muse aesthetic:
+ * Combines a fluid electric-blue rising attendance ribbon with a subtle
+ * Maasai shield / Savannah sun crest accent — never boxed in a square container.
  */
 export function BrandRibbon({ className = "w-16 h-16" }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 88 76"
+      viewBox="0 0 92 80"
       fill="none"
       className={className}
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id="muse-ribbon-a" x1="8" y1="62" x2="48" y2="10" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0056d6" />
-          <stop offset="55%" stopColor="#1877f2" />
-          <stop offset="100%" stopColor="#4593ff" />
-        </linearGradient>
-        <linearGradient id="muse-ribbon-b" x1="34" y1="64" x2="80" y2="16" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id="showup-kenya-blue"
+          x1="12"
+          y1="66"
+          x2="68"
+          y2="12"
+          gradientUnits="userSpaceOnUse"
+        >
           <stop offset="0%" stopColor="#0051c4" />
           <stop offset="50%" stopColor="#1877f2" />
           <stop offset="100%" stopColor="#5aa2ff" />
         </linearGradient>
+        <linearGradient
+          id="showup-savannah-gold"
+          x1="46"
+          y1="64"
+          x2="82"
+          y2="14"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0%" stopColor="#1877f2" />
+          <stop offset="65%" stopColor="#4589ff" />
+          <stop offset="100%" stopColor="#f59e0b" />
+        </linearGradient>
       </defs>
-      {/* Back fold shadow for ribbon depth */}
+
+      {/* Deep 3D shadow under-fold */}
       <path
-        d="M27 14C31 14 33 27 32 56"
-        stroke="#003c96"
-        strokeWidth="10.5"
+        d="M46 12C33 26 30 48 46 68C62 48 59 26 46 12Z"
+        stroke="#0a2558"
+        strokeWidth="9"
         strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.65"
       />
+
+      {/* Iconic Kenyan Shield Contour & Rising Attendance Wave */}
       <path
-        d="M54 22C57 22 58 35 56 56"
-        stroke="#003c96"
-        strokeWidth="10.5"
-        strokeLinecap="round"
-      />
-      {/* Primary calligraphic ribbon strokes */}
-      <path
-        d="M11 45C17 24 24 13 28 14C33 15 29 56 33 57C37 58 47 21 54 22"
-        stroke="url(#muse-ribbon-a)"
-        strokeWidth="10.5"
+        d="M16 52C22 34 33 16 46 12C59 16 66 36 52 54C41 67 31 54 39 39C47 24 64 22 77 17"
+        stroke="url(#showup-kenya-blue)"
+        strokeWidth="10"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+
+      {/* Warm Savannah sun / Maasai beadwork spark at the crest */}
       <path
-        d="M33 57C38 57 48 21 54 22C59 23 53 55 58 56C63 57 71 42 77 31"
-        stroke="url(#muse-ribbon-b)"
-        strokeWidth="10.5"
+        d="M46 42L60 28L77 17"
+        stroke="url(#showup-savannah-gold)"
+        strokeWidth="8.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      <circle cx="77" cy="17" r="5" fill="#fbbf24" />
     </svg>
   );
 }
 
 /**
- * Minimal top-left brand lockup (like "∞ Meta" in the Muse screenshot).
+ * Minimal top-left brand lockup in the Muse spirit, featuring the Kenyan shield-wave icon.
  */
 export function BrandWordmark({ subtitle }: { subtitle?: string }) {
   return (
     <span className="inline-flex items-center gap-2.5 select-none">
       <svg
-        viewBox="0 0 36 24"
+        viewBox="0 0 36 28"
         fill="none"
-        className="w-6 h-4 text-white shrink-0"
+        className="w-6 h-5 text-white shrink-0"
         aria-hidden="true"
       >
         <path
-          d="M3 16.5C5.5 8 9 4.5 11 5C13.2 5.5 11.5 18.5 13.8 19C16 19.5 20.5 7 23.2 7.5C25.5 8 23.5 18 26 18.5C28.2 19 31.2 13.5 33 9.5"
-          stroke="currentColor"
+          d="M4 20C7 12 12 5 18 3.5C24 5 26 13 20.5 20.5C16 26 11.5 20.5 15 14C18.5 7.5 26 7 32 4.5"
+          stroke="#4589ff"
           strokeWidth="3.2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
+        <circle cx="32" cy="4.5" r="2.3" fill="#fbbf24" />
       </svg>
       <span className="text-[17px] font-semibold tracking-[-0.02em] text-white">
         ShowUp
@@ -89,15 +106,26 @@ export function BrandWordmark({ subtitle }: { subtitle?: string }) {
 }
 
 /**
- * Inline 3D tactile avatar token that sits inside the H1 line after "ShowUp"
+ * Inline 3D tactile Kenyan Simba / Creator mascot token that sits inside the H1 line after "ShowUp"
  */
-export function InlineAvatarToken() {
+export function InlineAvatarToken({
+  variant = "simba",
+}: {
+  variant?: "simba" | "creator";
+}) {
+  const src =
+    variant === "creator"
+      ? "/tokens/kenya-creator-token.png"
+      : "/tokens/avatar-token.png";
   return (
-    <span className="inline-flex items-center justify-center align-middle mx-1.5 -mt-1.5 w-11 h-11 sm:w-14 sm:h-14 md:w-[60px] md:h-[60px] rounded-full overflow-hidden bg-[#e8dfd5] shadow-[0_4px_14px_rgba(0,0,0,0.45)] select-none shrink-0 transition-transform duration-200 hover:scale-105">
+    <span
+      title="ShowUp Kenya Mascot"
+      className="inline-flex items-center justify-center align-middle mx-1.5 -mt-1.5 w-11 h-11 sm:w-14 sm:h-14 md:w-[62px] md:h-[62px] rounded-full overflow-hidden bg-[#e8dfd5] shadow-[0_4px_14px_rgba(0,0,0,0.45)] select-none shrink-0 transition-transform duration-200 hover:scale-105"
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/tokens/avatar-token.png"
-        alt=""
+        src={src}
+        alt="ShowUp Kenyan Mascot"
         className="w-full h-full object-cover scale-[1.24]"
       />
     </span>
