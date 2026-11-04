@@ -90,11 +90,32 @@ export async function POST(req: Request) {
           .single();
         if (!error && data) return NextResponse.json({ event: data });
       }
+
+      // Try inserting full event payload
       const { data, error } = await supabase
         .from("showup_events")
         .insert(newEvent)
         .select("*")
         .single();
+
+      if (!error && data) {
+        return NextResponse.json({ event: data });
+      }
+
+      // Fallback: If table has not run the latest ALTER TABLE for is_paid/sender_mode, omit them
+      if (error && error.message?.includes("column")) {
+        const { is_paid: _p, sender_mode: _s, paid_pass_tier: _t, mpesa_receipt: _m, ...compatibleEvent } = newEvent;
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("showup_events")
+          .insert(compatibleEvent)
+          .select("*")
+          .single();
+
+        if (!fallbackError && fallbackData) {
+          return NextResponse.json({ event: { ...fallbackData, is_paid: Boolean(isPaid), sender_mode: senderMode } });
+        }
+        throw new Error(fallbackError?.message || error.message);
+      }
 
       if (error) throw new Error(error.message);
       return NextResponse.json({ event: data });
