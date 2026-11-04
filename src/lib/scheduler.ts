@@ -6,7 +6,7 @@ import {
   ShowUpTenant,
 } from "./types";
 import { buildGoogleCalendarUrl, formatEatDate } from "./default-templates";
-import { sendWhatsAppTemplateMessage } from "./whatsapp-api";
+import { dispatchSmartWhatsAppMessage } from "./whatsapp-api";
 import { checkSupabaseMigrationStatus, readLocalDb, supabase, writeLocalDb } from "./store";
 
 const QSTASH_URL = process.env.QSTASH_URL || "https://qstash.upstash.io";
@@ -197,12 +197,13 @@ export async function scheduleAndFireSequenceForRegistrant(params: {
         registrant,
       });
 
-      const sendResult = await sendWhatsAppTemplateMessage({
-        phoneNumberId: tenant.phone_number_id || "demo_phone_id",
-        accessToken: tenant.access_token || "demo_access_token",
+      const sendResult = await dispatchSmartWhatsAppMessage({
+        tenant,
+        senderMode: event.sender_mode || "shared_showup",
         toPhoneE164: registrant.phone_e164,
         templateName: item.templateName,
         bodyVariables: vars.bodyVariables,
+        recipientFirstName: registrant.full_name.trim().split(/\s+/)[0] || "Friend",
       });
 
       if (sendResult.success) {

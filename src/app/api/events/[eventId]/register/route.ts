@@ -43,18 +43,7 @@ export async function POST(
       );
     }
 
-    const { tenant } = await getActiveTenant();
     const supabaseReady = await checkSupabaseMigrationStatus();
-
-    // Check registrant limit on current plan
-    if (tenant.registrants_used_this_month >= tenant.registrant_limit) {
-      return NextResponse.json(
-        {
-          error: `Monthly registrant cap (${tenant.registrant_limit}) reached on the ${tenant.plan_tier.toUpperCase()} tier. Upgrade via M-Pesa to unlock more registrants.`,
-        },
-        { status: 402 }
-      );
-    }
 
     let event: ShowUpEvent | undefined;
     if (supabaseReady && supabase) {
@@ -71,6 +60,18 @@ export async function POST(
 
     if (!event) {
       return NextResponse.json({ error: "Webinar event not found." }, { status: 404 });
+    }
+
+    const { tenant } = await getActiveTenant(event.tenant_id);
+
+    // Check registrant limit on current plan
+    if (tenant.registrants_used_this_month >= tenant.registrant_limit) {
+      return NextResponse.json(
+        {
+          error: `Monthly registrant cap (${tenant.registrant_limit}) reached on the ${tenant.plan_tier.toUpperCase()} tier. Upgrade via M-Pesa to unlock more registrants.`,
+        },
+        { status: 402 }
+      );
     }
 
     const trackingToken = `${Math.random().toString(36).slice(2, 8)}${Date.now()

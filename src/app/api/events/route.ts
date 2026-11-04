@@ -1,12 +1,26 @@
 import { NextResponse } from "next/server";
+import { normalizeKenyanPhone } from "@/lib/phone";
 import {
   checkSupabaseMigrationStatus,
+  findOrCreateTenantByPhone,
   getActiveTenant,
   readLocalDb,
   supabase,
+  TENANT_COOKIE_NAME,
   writeLocalDb,
 } from "@/lib/store";
 import { ShowUpEvent } from "@/lib/types";
+
+function withTenantCookie(res: NextResponse, tenantId: string): NextResponse {
+  if (tenantId && tenantId !== "guest") {
+    res.cookies.set(TENANT_COOKIE_NAME, tenantId, {
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60,
+      sameSite: "lax",
+    });
+  }
+  return res;
+}
 
 export async function POST(req: Request) {
   try {
@@ -14,6 +28,7 @@ export async function POST(req: Request) {
     const {
       title,
       hostName,
+      hostPhone,
       teaserHook,
       startsAt,
       joinUrl,
@@ -35,8 +50,28 @@ export async function POST(req: Request) {
       );
     }
 
-    const { tenant } = await getActiveTenant();
+    let { tenant, isGuest } = await getActiveTenant();
     const supabaseReady = await checkSupabaseMigrationStatus();
+
+    const normalizedHostPhone = hostPhone
+      ? normalizeKenyanPhone(String(hostPhone))
+      : null;
+
+    if (normalizedHostPhone) {
+      tenant = await findOrCreateTenantByPhone({
+        phoneE164: normalizedHostPhone,
+        hostName: hostName || undefined,
+      });
+      isGuest = false;
+    } else if (isGuest) {
+      return NextResponse.json(
+        {
+          error:
+            "Please enter your Host WhatsApp number so we can save your live room.",
+        },
+        { status: 400 }
+      );
+    }
 
     const baseSlug = String(title)
       .toLowerCase()
@@ -88,7 +123,12 @@ export async function POST(req: Request) {
           .eq("id", eventId)
           .select("*")
           .single();
-        if (!error && data) return NextResponse.json({ event: data });
+        if (!error && data) {
+          return withTenantCookie(
+            NextResponse.json({ event: data, tenant }),
+            tenant.id
+          );
+        }
       }
 
       // Try inserting full event payload
@@ -99,7 +139,10 @@ export async function POST(req: Request) {
         .single();
 
       if (!error && data) {
-        return NextResponse.json({ event: data });
+        return withTenantCookie(
+          NextResponse.json({ event: data, tenant }),
+          tenant.id
+        );
       }
 
       // Fallback: If table has not run the latest ALTER TABLE for is_paid/sender_mode, omit them
@@ -112,13 +155,26 @@ export async function POST(req: Request) {
           .single();
 
         if (!fallbackError && fallbackData) {
-          return NextResponse.json({ event: { ...fallbackData, is_paid: Boolean(isPaid), sender_mode: senderMode } });
+          return withTenantCookie(
+            NextResponse.json({
+              event: {
+                ...fallbackData,
+                is_paid: Boolean(isPaid),
+                sender_mode: senderMode,
+              },
+              tenant,
+            }),
+            tenant.id
+          );
         }
         throw new Error(fallbackError?.message || error.message);
       }
 
       if (error) throw new Error(error.message);
-      return NextResponse.json({ event: data });
+      return withTenantCookie(
+        NextResponse.json({ event: data, tenant }),
+        tenant.id
+      );
     }
 
     const db = readLocalDb();
@@ -135,13 +191,19 @@ export async function POST(req: Request) {
           sender_mode: newEvent.sender_mode,
         };
         writeLocalDb(db);
-        return NextResponse.json({ event: db.events[existingIdx] });
+        return withTenantCookie(
+          NextResponse.json({ event: db.events[existingIdx], tenant }),
+          tenant.id
+        );
       }
     }
     db.events.unshift(newEvent);
     writeLocalDb(db);
 
-    return NextResponse.json({ event: newEvent });
+    return withTenantCookie(
+      NextResponse.json({ event: newEvent, tenant }),
+      tenant.id
+    );
   } catch (err: unknown) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed creating event" },

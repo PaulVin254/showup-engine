@@ -23,7 +23,6 @@ export async function POST(
       return NextResponse.json({ error: "No CSV rows provided" }, { status: 400 });
     }
 
-    const { tenant } = await getActiveTenant();
     const supabaseReady = await checkSupabaseMigrationStatus();
 
     const db = readLocalDb();
@@ -41,6 +40,8 @@ export async function POST(
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
+
+    const { tenant } = await getActiveTenant(event.tenant_id);
 
     // MODE A: Reconcile post-webinar Zoom / Google Meet Attendance CSV
     if (mode === "attendance_reconcile") {

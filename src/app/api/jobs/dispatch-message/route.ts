@@ -13,14 +13,13 @@ import {
   ShowUpRegistrant,
   ShowUpScheduledMessage,
 } from "@/lib/types";
-import { sendWhatsAppTemplateMessage } from "@/lib/whatsapp-api";
+import { dispatchSmartWhatsAppMessage } from "@/lib/whatsapp-api";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { scheduledMessageId, eventId, stage } = body;
 
-    const { tenant } = await getActiveTenant();
     const supabaseReady = await checkSupabaseMigrationStatus();
     const db = readLocalDb();
 
@@ -48,6 +47,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Event not found" }, { status: 404 });
       }
 
+      const { tenant } = await getActiveTenant(event.tenant_id);
       const stageKey = stage as SequenceStage;
       const templateName =
         event.stage_templates?.[stageKey] || "event_registration_confirmed";
@@ -60,13 +60,14 @@ export async function POST(req: Request) {
           registrant: reg,
         });
 
-        const res = await sendWhatsAppTemplateMessage({
-          phoneNumberId: tenant.phone_number_id || "demo_phone_id",
-          accessToken: tenant.access_token || "demo_access_token",
+        const res = await dispatchSmartWhatsAppMessage({
+          tenant,
+          senderMode: event.sender_mode || "shared_showup",
           toPhoneE164: reg.phone_e164,
           templateName,
           bodyVariables: vars.bodyVariables,
           buttonUrlSuffix: vars.buttonUrlSuffix,
+          recipientFirstName: reg.full_name.trim().split(/\s+/)[0] || "Friend",
         });
 
         if (res.success) {
@@ -140,8 +141,21 @@ export async function POST(req: Request) {
       });
     }
 
-    const event = db.events.find((e) => e.id === msg!.event_id);
-    const registrant = db.registrants.find((r) => r.id === msg!.registrant_id);
+    let event = db.events.find((e) => e.id === msg!.event_id);
+    let registrant = db.registrants.find((r) => r.id === msg!.registrant_id);
+
+    if (supabaseReady && supabase) {
+      const [evRes, regRes] = await Promise.all([
+        supabase.from("showup_events").select("*").eq("id", msg.event_id).maybeSingle(),
+        supabase
+          .from("showup_registrants")
+          .select("*")
+          .eq("id", msg.registrant_id)
+          .maybeSingle(),
+      ]);
+      if (evRes.data) event = evRes.data as ShowUpEvent;
+      if (regRes.data) registrant = regRes.data as ShowUpRegistrant;
+    }
 
     if (!event || !registrant || registrant.opted_out) {
       return NextResponse.json({
@@ -151,19 +165,22 @@ export async function POST(req: Request) {
       });
     }
 
+    const { tenant } = await getActiveTenant(msg.tenant_id);
+
     const vars = buildStageVariables({
       stage: msg.stage,
       event,
       registrant,
     });
 
-    const sendRes = await sendWhatsAppTemplateMessage({
-      phoneNumberId: tenant.phone_number_id || "demo_phone_id",
-      accessToken: tenant.access_token || "demo_access_token",
+    const sendRes = await dispatchSmartWhatsAppMessage({
+      tenant,
+      senderMode: event.sender_mode || "shared_showup",
       toPhoneE164: registrant.phone_e164,
       templateName: msg.template_name,
       bodyVariables: vars.bodyVariables,
       buttonUrlSuffix: vars.buttonUrlSuffix,
+      recipientFirstName: registrant.full_name.trim().split(/\s+/)[0] || "Friend",
     });
 
     const nowIso = new Date().toISOString();

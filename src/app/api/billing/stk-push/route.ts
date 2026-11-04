@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { normalizeKenyanPhone } from "@/lib/phone";
 import {
   checkSupabaseMigrationStatus,
+  findOrCreateTenantByPhone,
   getActiveTenant,
   readLocalDb,
   supabase,
@@ -57,7 +58,10 @@ export async function POST(req: Request) {
       planTier in tierPricing ? planTier : "event_pass";
     const { amountKes, limit: newLimit, label } = tierPricing[resolvedTier];
 
-    const { tenant } = await getActiveTenant();
+    let { tenant } = await getActiveTenant();
+    if (tenant.id === "guest") {
+      tenant = await findOrCreateTenantByPhone({ phoneE164 });
+    }
     const supabaseReady = await checkSupabaseMigrationStatus();
 
     const checkoutRequestId = `ws_CO_${Date.now()}_${Math.random()
@@ -84,24 +88,50 @@ export async function POST(req: Request) {
     const nextCycle = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     if (supabaseReady && supabase) {
-      await supabase.from("showup_payments").insert(payment);
+      const { event_id: _evId, ...paymentCompat } = payment;
+      const { error: payErr } = await supabase.from("showup_payments").insert(payment);
+      if (payErr) {
+        // Fallback if event_id column not on showup_payments
+        await supabase.from("showup_payments").insert({
+          ...paymentCompat,
+          plan_tier: resolvedTier === "event_scale" ? "pro" : "starter",
+        });
+      }
+
       await supabase
         .from("showup_tenants")
         .update({
-          plan_tier: payment.plan_tier,
+          plan_tier:
+            resolvedTier === "event_scale" || resolvedTier === "pro"
+              ? "pro"
+              : "starter",
           registrant_limit: Math.max(tenant.registrant_limit, newLimit),
           billing_cycle_end: nextCycle,
         })
         .eq("id", tenant.id);
+
+      if (eventId) {
+        await supabase
+          .from("showup_events")
+          .update({
+            is_paid: true,
+            paid_pass_tier: resolvedTier,
+            mpesa_receipt: mpesaReceipt,
+            sender_mode: senderMode === "own_waba" ? "own_waba" : "shared_showup",
+          })
+          .eq("id", eventId);
+      }
     } else {
       const db = readLocalDb();
       db.payments.unshift(payment);
-      db.tenants[0].plan_tier = payment.plan_tier;
-      db.tenants[0].registrant_limit = Math.max(
-        db.tenants[0].registrant_limit,
+      const tIdx = db.tenants.findIndex((t) => t.id === tenant.id);
+      const targetTenant = tIdx >= 0 ? db.tenants[tIdx] : db.tenants[0];
+      targetTenant.plan_tier = payment.plan_tier;
+      targetTenant.registrant_limit = Math.max(
+        targetTenant.registrant_limit,
         newLimit
       );
-      db.tenants[0].billing_cycle_end = nextCycle;
+      targetTenant.billing_cycle_end = nextCycle;
 
       if (eventId) {
         const evIdx = db.events.findIndex((e) => e.id === eventId);

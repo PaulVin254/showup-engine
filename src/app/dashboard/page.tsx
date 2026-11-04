@@ -43,6 +43,7 @@ import {
 import { formatPhoneDisplay } from "@/lib/phone";
 import { EmbeddedSignupModal } from "@/components/whatsapp/EmbeddedSignupModal";
 import { EventSetupWizard } from "@/components/wizard/EventSetupWizard";
+import { HostAuthModal } from "@/components/auth/HostAuthModal";
 import { BrandRibbon, BrandWordmark } from "@/components/BrandMark";
 
 const STAGES_META: Array<{
@@ -116,6 +117,7 @@ export default function DashboardPage() {
 
   // Modals & UI drawers
   const [isEmbeddedModalOpen, setIsEmbeddedModalOpen] = useState(false);
+  const [isHostAuthOpen, setIsHostAuthOpen] = useState(false);
   const [showLeadsDrawer, setShowLeadsDrawer] = useState(false);
   const [showAdvancedAccount, setShowAdvancedAccount] = useState(false);
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
@@ -166,9 +168,11 @@ export default function DashboardPage() {
       if (!selectedEventId && loadedEvents.length > 0) {
         setSelectedEventId(loadedEvents[0].id);
       }
-      if (loadedEvents.length === 0) {
-        setTrackerView("zero");
-      }
+      setTrackerView((prev) => {
+        if (loadedEvents.length === 0 && prev !== "wizard") return "zero";
+        if (loadedEvents.length > 0 && prev === "zero") return "active";
+        return prev;
+      });
     } finally {
       setLoading(false);
     }
@@ -496,6 +500,17 @@ export default function DashboardPage() {
 
             <button
               type="button"
+              onClick={() => setIsHostAuthOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium text-[#d1d5db] bg-[#17191e] hover:bg-[#25272c] border border-white/[0.08] transition"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-[#4589ff]" />
+              {tenant.id === "guest" || !tenant.phone_e164
+                ? "Host Sign In"
+                : formatPhoneDisplay(tenant.phone_e164)}
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 setTopNav("events");
                 setWizardInitialEvent(null);
@@ -600,17 +615,28 @@ export default function DashboardPage() {
                       <ArrowRight className="w-4 h-4" />
                     </button>
 
-                    <button
-                      type="button"
-                      disabled={sendingPreview}
-                      onClick={handleSendSelfPreview}
-                      className="text-xs text-[#9ca3af] hover:text-white underline underline-offset-4 transition inline-flex items-center gap-1.5"
-                    >
-                      {sendingPreview && (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      )}
-                      Send me a test WhatsApp message first
-                    </button>
+                    <div className="flex flex-wrap items-center justify-center gap-4 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsHostAuthOpen(true)}
+                        className="text-xs text-[#7db4ff] hover:text-white underline underline-offset-4 transition inline-flex items-center gap-1.5"
+                      >
+                        <Smartphone className="w-3.5 h-3.5" />
+                        Already created a room? Sign in via WhatsApp OTP
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={sendingPreview}
+                        onClick={handleSendSelfPreview}
+                        className="text-xs text-[#9ca3af] hover:text-white underline underline-offset-4 transition inline-flex items-center gap-1.5"
+                      >
+                        {sendingPreview && (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        )}
+                        Send me a test WhatsApp message
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1510,6 +1536,17 @@ export default function DashboardPage() {
             `Connected Official WABA (${updatedTenant.waba_id}) & provisioned 5 Webinar Templates!`
           );
           loadWorkspace();
+        }}
+      />
+
+      {/* HOST WHATSAPP OTP SIGN-IN MODAL */}
+      <HostAuthModal
+        isOpen={isHostAuthOpen}
+        onClose={() => setIsHostAuthOpen(false)}
+        onAuthenticated={async (msg) => {
+          setSelectedEventId("");
+          await loadWorkspace();
+          showToast(msg);
         }}
       />
     </div>

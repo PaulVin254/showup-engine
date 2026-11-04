@@ -81,6 +81,9 @@ export function EventSetupWizard({
   const [joinUrl, setJoinUrl] = useState(
     initialEvent?.join_url || "https://meet.google.com/landing"
   );
+  const [hostPhone, setHostPhone] = useState(
+    initialPhone || tenant.phone_e164 || ""
+  );
   const [savingStep1, setSavingStep1] = useState(false);
 
   // Step 2 state: Add Your People (60s)
@@ -124,6 +127,7 @@ export function EventSetupWizard({
           eventId: currentEvent?.id,
           title: title.trim(),
           hostName: tenant.business_name.split(" ")[0] || "Founder",
+          hostPhone: hostPhone.trim(),
           startsAt: new Date(startsAtLocal).toISOString(),
           joinUrl: joinUrl.trim(),
           senderMode,
@@ -132,6 +136,9 @@ export function EventSetupWizard({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save webinar");
       setCurrentEvent(data.event);
+      if (hostPhone.trim()) {
+        setMpesaPhone(hostPhone.trim());
+      }
       await onEventSaved(data.event);
       setStep(2);
     } catch (err: unknown) {
@@ -365,6 +372,23 @@ export function EventSetupWizard({
                   placeholder="https://zoom.us/j/... or https://meet.google.com/..."
                   value={joinUrl}
                   onChange={(e) => setJoinUrl(e.target.value)}
+                  className={`${MUSE_INPUT} font-mono`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-[#9ca3af] mb-2 ml-3">
+                  Your WhatsApp number{" "}
+                  <span className="text-[#8a909e]">
+                    (saves your private room &amp; M-Pesa receipt)
+                  </span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="0712 345 678"
+                  value={hostPhone}
+                  onChange={(e) => setHostPhone(e.target.value)}
                   className={`${MUSE_INPUT} font-mono`}
                 />
               </div>
@@ -712,13 +736,13 @@ export function EventSetupWizard({
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-[#9ca3af]">
                       {tenant.waba_status === "connected"
                         ? "Connected"
-                        : "Recommended later"}
+                        : "Free Power-Up"}
                     </span>
                   </div>
                   <p className="text-[11px] text-[#8a909e] mt-1.5">
                     {tenant.waba_status === "connected"
-                      ? `Sending from ${tenant.display_phone_number}`
-                      : "Requires Meta Embedded Signup. You can upgrade anytime after your first event."}
+                      ? `Sending from ${tenant.display_phone_number} (with Smart Auto-Fallback to our number while templates review).`
+                      : "Connect via 1-Click Meta Embedded Signup. Auto-falls back to our verified number while Meta approves your templates."}
                   </p>
                 </button>
               </div>

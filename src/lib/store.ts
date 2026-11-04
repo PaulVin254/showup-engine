@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import {
   ShowUpEvent,
@@ -31,6 +32,16 @@ const DB_FILE = path.join(DATA_DIR, "showup-db.json");
 
 export const DEFAULT_TENANT_ID = "11111111-1111-1111-1111-111111111111";
 export const DEMO_EVENT_ID = "22222222-2222-2222-2222-222222222222";
+export const TENANT_COOKIE_NAME = "showup_tenant_id";
+
+export function getCookieTenantId(): string | null {
+  try {
+    const cookieStore = cookies();
+    return cookieStore.get(TENANT_COOKIE_NAME)?.value || null;
+  } catch {
+    return null;
+  }
+}
 
 function createInitialSeed(): LocalDbSchema {
   const now = new Date();
@@ -238,44 +249,142 @@ export async function checkSupabaseMigrationStatus(): Promise<boolean> {
   }
 }
 
-export async function getActiveTenant(): Promise<{
-  tenant: ShowUpTenant;
-  supabaseReady: boolean;
-}> {
+export async function getTenantById(tenantId: string): Promise<ShowUpTenant | null> {
+  if (!tenantId || tenantId === "guest") return null;
   const supabaseReady = await checkSupabaseMigrationStatus();
+
   if (supabaseReady && supabase) {
     const { data } = await supabase
       .from("showup_tenants")
       .select("*")
+      .eq("id", tenantId)
+      .maybeSingle();
+    if (data) return data as ShowUpTenant;
+  }
+
+  const db = readLocalDb();
+  return db.tenants.find((t) => t.id === tenantId) || null;
+}
+
+export async function findOrCreateTenantByPhone(params: {
+  phoneE164: string;
+  hostName?: string;
+}): Promise<ShowUpTenant> {
+  const { phoneE164, hostName } = params;
+  const supabaseReady = await checkSupabaseMigrationStatus();
+  const now = new Date().toISOString();
+
+  if (supabaseReady && supabase) {
+    const { data: existing } = await supabase
+      .from("showup_tenants")
+      .select("*")
+      .eq("phone_e164", phoneE164)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
 
-    if (data) {
-      return { tenant: data as ShowUpTenant, supabaseReady: true };
+    if (existing) {
+      return existing as ShowUpTenant;
     }
 
-    // Seed initial tenant in Supabase if table is empty
-    const seed = readLocalDb();
-    const firstTenant = seed.tenants[0];
-    const { data: inserted } = await supabase
+    const newTenant: ShowUpTenant = {
+      id: crypto.randomUUID(),
+      business_name: hostName ? `${hostName}'s Live Room` : `Host (${phoneE164})`,
+      email: "",
+      phone_e164: phoneE164,
+      waba_id: null,
+      phone_number_id: null,
+      display_phone_number: null,
+      access_token: null,
+      waba_status: "disconnected",
+      connected_at: null,
+      plan_tier: "pilot",
+      registrant_limit: 150,
+      registrants_used_this_month: 0,
+      billing_cycle_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+      created_at: now,
+    };
+
+    const { data: inserted, error } = await supabase
       .from("showup_tenants")
-      .insert(firstTenant)
+      .insert(newTenant)
       .select("*")
       .single();
 
-    if (inserted) {
-      // Also seed system templates
+    if (!error && inserted) {
+      const templates = seedSystemTemplatesForTenant(inserted.id);
       await supabase.from("showup_templates").upsert(
-        seed.templates.map(({ id: _unused, ...rest }) => rest),
+        templates.map(({ id: _unused, ...rest }) => rest),
         { onConflict: "tenant_id,name,language" }
       );
-      return { tenant: inserted as ShowUpTenant, supabaseReady: true };
+      return inserted as ShowUpTenant;
     }
   }
 
   const db = readLocalDb();
-  return { tenant: db.tenants[0], supabaseReady };
+  const existingLocal = db.tenants.find((t) => t.phone_e164 === phoneE164);
+  if (existingLocal) return existingLocal;
+
+  const newLocalTenant: ShowUpTenant = {
+    id: crypto.randomUUID(),
+    business_name: hostName ? `${hostName}'s Live Room` : `Host (${phoneE164})`,
+    email: "",
+    phone_e164: phoneE164,
+    waba_id: null,
+    phone_number_id: null,
+    display_phone_number: null,
+    access_token: null,
+    waba_status: "disconnected",
+    connected_at: null,
+    plan_tier: "pilot",
+    registrant_limit: 150,
+    registrants_used_this_month: 0,
+    billing_cycle_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+    created_at: now,
+  };
+
+  db.tenants.push(newLocalTenant);
+  db.templates.push(...seedSystemTemplatesForTenant(newLocalTenant.id));
+  writeLocalDb(db);
+  return newLocalTenant;
+}
+
+export async function getActiveTenant(explicitTenantId?: string | null): Promise<{
+  tenant: ShowUpTenant;
+  supabaseReady: boolean;
+  isGuest: boolean;
+}> {
+  const supabaseReady = await checkSupabaseMigrationStatus();
+  const targetTenantId = explicitTenantId || getCookieTenantId();
+
+  if (targetTenantId && targetTenantId !== "guest") {
+    const found = await getTenantById(targetTenantId);
+    if (found) {
+      return { tenant: found, supabaseReady, isGuest: false };
+    }
+  }
+
+  // Unauthenticated / new visitor gets a clean isolated starter state (0 events)
+  const now = new Date().toISOString();
+  const guestTenant: ShowUpTenant = {
+    id: "guest",
+    business_name: "Your Live Room",
+    email: "",
+    phone_e164: "",
+    waba_id: null,
+    phone_number_id: null,
+    display_phone_number: null,
+    access_token: null,
+    waba_status: "disconnected",
+    connected_at: null,
+    plan_tier: "pilot",
+    registrant_limit: 150,
+    registrants_used_this_month: 0,
+    billing_cycle_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+    created_at: now,
+  };
+
+  return { tenant: guestTenant, supabaseReady, isGuest: true };
 }
 
 export async function updateTenantWabaConnection(params: {

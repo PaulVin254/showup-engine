@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { seedSystemTemplatesForTenant } from "@/lib/default-templates";
 import {
-  checkSupabaseMigrationStatus,
   getActiveTenant,
   readLocalDb,
   supabase,
@@ -10,7 +10,22 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { tenant, supabaseReady } = await getActiveTenant();
+    const { tenant, supabaseReady, isGuest } = await getActiveTenant();
+
+    if (isGuest) {
+      return NextResponse.json({
+        supabaseReady,
+        isGuest: true,
+        tenant,
+        events: [],
+        templates: seedSystemTemplatesForTenant("guest"),
+        registrants: [],
+        scheduled_messages: [],
+        payments: [],
+        metaConfigId: process.env.NEXT_PUBLIC_META_CONFIG_ID || "1433645942194259",
+        metaAppId: process.env.NEXT_PUBLIC_META_APP_ID || "",
+      });
+    }
 
     if (supabaseReady && supabase) {
       const [eventsRes, templatesRes, registrantsRes, messagesRes, paymentsRes] =
@@ -44,9 +59,13 @@ export async function GET() {
 
       return NextResponse.json({
         supabaseReady: true,
+        isGuest: false,
         tenant,
         events: eventsRes.data || [],
-        templates: templatesRes.data || [],
+        templates:
+          templatesRes.data && templatesRes.data.length > 0
+            ? templatesRes.data
+            : seedSystemTemplatesForTenant(tenant.id),
         registrants: registrantsRes.data || [],
         scheduled_messages: messagesRes.data || [],
         payments: paymentsRes.data || [],
@@ -56,16 +75,18 @@ export async function GET() {
     }
 
     const db = readLocalDb();
-    const supabaseCheck = await checkSupabaseMigrationStatus();
 
     return NextResponse.json({
-      supabaseReady: supabaseCheck,
-      tenant: db.tenants[0],
-      events: db.events,
-      templates: db.templates,
-      registrants: db.registrants,
-      scheduled_messages: db.scheduled_messages,
-      payments: db.payments,
+      supabaseReady,
+      isGuest: false,
+      tenant,
+      events: db.events.filter((e) => e.tenant_id === tenant.id),
+      templates: db.templates.filter((t) => t.tenant_id === tenant.id),
+      registrants: db.registrants.filter((r) => r.tenant_id === tenant.id),
+      scheduled_messages: db.scheduled_messages.filter(
+        (m) => m.tenant_id === tenant.id
+      ),
+      payments: db.payments.filter((p) => p.tenant_id === tenant.id),
       metaConfigId: process.env.NEXT_PUBLIC_META_CONFIG_ID || "1433645942194259",
       metaAppId: process.env.NEXT_PUBLIC_META_APP_ID || "",
     });

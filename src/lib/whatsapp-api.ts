@@ -1,4 +1,5 @@
 import { DEFAULT_WEBINAR_TEMPLATES } from "./default-templates";
+import { SenderMode, ShowUpTenant } from "./types";
 
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
@@ -353,4 +354,136 @@ export async function sendWhatsAppTemplateMessage(
     };
   }
 }
+
+export interface SmartDispatchInput {
+  tenant: ShowUpTenant;
+  senderMode?: SenderMode;
+  toPhoneE164: string;
+  templateName: string;
+  languageCode?: string;
+  bodyVariables?: string[];
+  namedVariables?: Record<string, string>;
+  buttonUrlSuffix?: string;
+  recipientFirstName?: string;
+}
+
+export interface SmartDispatchResult extends SendTemplateMessageResult {
+  senderUsed: "own_waba" | "shared_showup";
+  fellBackFromOwnWaba?: boolean;
+  usedApprovedFallbackTemplate?: boolean;
+}
+
+/**
+ * 9. Smart Hybrid WhatsApp Router:
+ * - Attempts Host's Own WABA first when `senderMode === 'own_waba'` and WABA is connected.
+ * - Automatically falls back to Verified Shared ShowUp Number if Host's templates are still PENDING.
+ * - Automatically falls back to approved template `ksl_class3_reminder_v2` if custom template is still PENDING Meta review.
+ */
+export async function dispatchSmartWhatsAppMessage(
+  input: SmartDispatchInput
+): Promise<SmartDispatchResult> {
+  const {
+    tenant,
+    senderMode = "shared_showup",
+    toPhoneE164,
+    templateName,
+    languageCode = "en",
+    bodyVariables,
+    namedVariables,
+    buttonUrlSuffix,
+    recipientFirstName = "Friend",
+  } = input;
+
+  const sharedPhoneId =
+    process.env.SHOWUP_SHARED_PHONE_NUMBER_ID || "1017704028092663";
+  const sharedToken =
+    process.env.SHOWUP_SHARED_ACCESS_TOKEN || "demo_access_token";
+
+  const wantsOwnWaba =
+    senderMode === "own_waba" &&
+    tenant.waba_status === "connected" &&
+    Boolean(tenant.phone_number_id) &&
+    Boolean(tenant.access_token) &&
+    !tenant.access_token?.startsWith("demo_");
+
+  // 1. Try Host's Own WABA first if selected & connected
+  if (wantsOwnWaba && tenant.phone_number_id && tenant.access_token) {
+    const ownRes = await sendWhatsAppTemplateMessage({
+      phoneNumberId: tenant.phone_number_id,
+      accessToken: tenant.access_token,
+      toPhoneE164,
+      templateName,
+      languageCode,
+      bodyVariables,
+      namedVariables,
+      buttonUrlSuffix,
+    });
+
+    if (ownRes.success) {
+      return {
+        ...ownRes,
+        senderUsed: "own_waba",
+      };
+    }
+    // If own WABA failed (e.g. newly provisioned templates still PENDING review), fall through to Shared ShowUp Number!
+  }
+
+  // 2. Dispatch via Verified Shared ShowUp Number
+  const sharedRes = await sendWhatsAppTemplateMessage({
+    phoneNumberId: sharedPhoneId,
+    accessToken: sharedToken,
+    toPhoneE164,
+    templateName,
+    languageCode,
+    bodyVariables,
+    namedVariables,
+    buttonUrlSuffix,
+  });
+
+  if (sharedRes.success) {
+    return {
+      ...sharedRes,
+      senderUsed: "shared_showup",
+      fellBackFromOwnWaba: wantsOwnWaba,
+    };
+  }
+
+  // 3. If custom webinar template on Shared Number is still PENDING review (132001), fallback to approved template
+  const isTemplatePending =
+    sharedRes.error?.includes("132001") ||
+    sharedRes.error?.includes("does not exist") ||
+    sharedRes.error?.includes("131058");
+
+  if (isTemplatePending) {
+    const fallbackName =
+      recipientFirstName ||
+      (bodyVariables && bodyVariables[0]) ||
+      "Friend";
+
+    const approvedFallbackRes = await sendWhatsAppTemplateMessage({
+      phoneNumberId: sharedPhoneId,
+      accessToken: sharedToken,
+      toPhoneE164,
+      templateName: "ksl_class3_reminder_v2",
+      languageCode: "en",
+      namedVariables: { name: fallbackName },
+    });
+
+    if (approvedFallbackRes.success) {
+      return {
+        ...approvedFallbackRes,
+        senderUsed: "shared_showup",
+        fellBackFromOwnWaba: wantsOwnWaba,
+        usedApprovedFallbackTemplate: true,
+      };
+    }
+  }
+
+  return {
+    ...sharedRes,
+    senderUsed: "shared_showup",
+    fellBackFromOwnWaba: wantsOwnWaba,
+  };
+}
+
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeKenyanPhone } from "@/lib/phone";
 import {
   exchangeCodeForToken,
   fetchPhoneNumberDetails,
@@ -6,7 +7,12 @@ import {
   registerPhoneNumber,
   subscribeAppToWaba,
 } from "@/lib/whatsapp-api";
-import { getActiveTenant, updateTenantWabaConnection } from "@/lib/store";
+import {
+  findOrCreateTenantByPhone,
+  getActiveTenant,
+  TENANT_COOKIE_NAME,
+  updateTenantWabaConnection,
+} from "@/lib/store";
 
 export async function POST(req: Request) {
   try {
@@ -85,21 +91,40 @@ export async function POST(req: Request) {
     }
 
     // 3. Persist WABA connection to Tenant record
+    let targetTenant = tenant;
+    if (targetTenant.id === "guest") {
+      const normPhone =
+        normalizeKenyanPhone(resolvedDisplayPhone) || `waba_${wabaId}`;
+      targetTenant = await findOrCreateTenantByPhone({
+        phoneE164: normPhone,
+        hostName: "Connected Business",
+      });
+    }
+
     const updatedTenant = await updateTenantWabaConnection({
-      tenantId: tenant.id,
+      tenantId: targetTenant.id,
       wabaId,
       phoneNumberId,
       displayPhoneNumber: resolvedDisplayPhone,
       accessToken: clientAccessToken,
     });
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       tenant: updatedTenant,
       stepsLog,
       message:
         "Official WhatsApp Business Account connected & 5 Webinar Templates provisioned!",
     });
+
+    if (updatedTenant.id && updatedTenant.id !== "guest") {
+      res.cookies.set(TENANT_COOKIE_NAME, updatedTenant.id, {
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+        sameSite: "lax",
+      });
+    }
+    return res;
   } catch (err: unknown) {
     return NextResponse.json(
       {
