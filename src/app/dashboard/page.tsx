@@ -44,6 +44,7 @@ import { formatPhoneDisplay } from "@/lib/phone";
 import { EmbeddedSignupModal } from "@/components/whatsapp/EmbeddedSignupModal";
 import { EventSetupWizard } from "@/components/wizard/EventSetupWizard";
 import { HostAuthModal } from "@/components/auth/HostAuthModal";
+import { ElevatedHeroTracker } from "@/components/dashboard/ElevatedHeroTracker";
 import { BrandRibbon, BrandWordmark } from "@/components/BrandMark";
 
 const STAGES_META: Array<{
@@ -501,12 +502,17 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setIsHostAuthOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium text-[#d1d5db] bg-[#17191e] hover:bg-[#25272c] border border-white/[0.08] transition"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium text-[#d1d5db] bg-[#17191e] hover:bg-[#25272c] border border-white/[0.08] transition shadow-sm"
             >
-              <Smartphone className="w-3.5 h-3.5 text-[#4589ff]" />
-              {tenant.id === "guest" || !tenant.phone_e164
+              <Smartphone className="w-3.5 h-3.5 text-[#3b82f6]" />
+              {!tenant || tenant.id === "guest" || !tenant.phone_e164
                 ? "Host Sign In"
-                : formatPhoneDisplay(tenant.phone_e164)}
+                : (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>{formatPhoneDisplay(tenant.phone_e164)}</span>
+                  </span>
+                )}
             </button>
 
             <button
@@ -587,55 +593,74 @@ export default function DashboardPage() {
             {/* ========================================================= */}
             {trackerView === "zero" && (
               <div className="py-12">
-                <div className="max-w-lg mx-auto bg-[#17191e] border border-white/[0.08] rounded-3xl p-8 sm:p-10 text-center space-y-6">
-                  <div className="flex justify-center">
-                    <BrandRibbon className="w-16 h-14" />
-                  </div>
-                  <div className="space-y-2">
-                    <h1 className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-white">
-                      Fill your next live room on WhatsApp.
-                    </h1>
-                    <p className="text-xs sm:text-sm text-[#8a909e] leading-relaxed">
-                      Set up your webinar in 3 minutes. Share your registration
-                      link or paste your leads, and let ShowUp run the 5-stage
-                      countdown automatically.
-                    </p>
-                  </div>
+                <div className="relative group max-w-lg mx-auto">
+                  <div className="absolute -inset-1 rounded-[36px] bg-gradient-to-r from-[#2563eb]/20 via-emerald-500/15 to-[#2563eb]/20 opacity-70 blur-xl group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
+                  <div className="relative bg-[#13151a]/95 backdrop-blur-2xl border border-white/[0.12] rounded-[32px] p-8 sm:p-10 text-center space-y-6 shadow-2xl">
+                    <div className="flex justify-center">
+                      <BrandRibbon className="w-16 h-14" />
+                    </div>
+                    <div className="space-y-2">
+                      <h1 className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-white">
+                        Fill your next live room on WhatsApp.
+                      </h1>
+                      <p className="text-xs sm:text-sm text-[#8a909e] leading-relaxed">
+                        Set up your webinar in 3 minutes. Share your registration
+                        link or paste your leads, and let ShowUp run the 5-stage
+                        countdown automatically.
+                      </p>
+                    </div>
 
-                  <div className="space-y-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWizardInitialEvent(null);
-                        setTrackerView("wizard");
-                      }}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-white font-medium text-sm py-4 px-6 transition"
-                    >
-                      Create your first webinar
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                    {/* 3 Value Pillars */}
+                    <div className="grid grid-cols-3 gap-2 text-[11px] font-mono text-[#94a3b8] pt-1">
+                      <div className="p-2.5 rounded-xl bg-[#0d0e12] border border-white/[0.04]">
+                        <div className="text-white font-medium">98% Open</div>
+                        <div className="text-[10px] text-[#64748b]">WhatsApp API</div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[#0d0e12] border border-white/[0.04]">
+                        <div className="text-white font-medium">EAT Native</div>
+                        <div className="text-[10px] text-[#64748b]">Kenya Time</div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[#0d0e12] border border-white/[0.04]">
+                        <div className="text-white font-medium">M-Pesa</div>
+                        <div className="text-[10px] text-[#64748b]">Pay-on-launch</div>
+                      </div>
+                    </div>
 
-                    <div className="flex flex-wrap items-center justify-center gap-4 pt-1">
+                    <div className="space-y-3 pt-2">
                       <button
                         type="button"
-                        onClick={() => setIsHostAuthOpen(true)}
-                        className="text-xs text-[#7db4ff] hover:text-white underline underline-offset-4 transition inline-flex items-center gap-1.5"
+                        onClick={() => {
+                          setWizardInitialEvent(null);
+                          setTrackerView("wizard");
+                        }}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#2563eb] to-[#1d4ed8] hover:from-[#3b82f6] hover:to-[#2563eb] text-white font-medium text-sm py-3.5 px-6 transition shadow-lg shadow-blue-500/20 active:scale-[0.99]"
                       >
-                        <Smartphone className="w-3.5 h-3.5" />
-                        Already created a room? Sign in via WhatsApp OTP
+                        Create your first webinar
+                        <ArrowRight className="w-4 h-4" />
                       </button>
 
-                      <button
-                        type="button"
-                        disabled={sendingPreview}
-                        onClick={handleSendSelfPreview}
-                        className="text-xs text-[#9ca3af] hover:text-white underline underline-offset-4 transition inline-flex items-center gap-1.5"
-                      >
-                        {sendingPreview && (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        )}
-                        Send me a test WhatsApp message
-                      </button>
+                      <div className="flex flex-wrap items-center justify-center gap-4 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsHostAuthOpen(true)}
+                          className="text-xs text-[#7db4ff] hover:text-white underline underline-offset-4 transition inline-flex items-center gap-1.5"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          Already created a room? Sign in via WhatsApp OTP
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={sendingPreview}
+                          onClick={handleSendSelfPreview}
+                          className="text-xs text-[#9ca3af] hover:text-white underline underline-offset-4 transition inline-flex items-center gap-1.5"
+                        >
+                          {sendingPreview && (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          )}
+                          Send me a test WhatsApp message
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -684,328 +709,25 @@ export default function DashboardPage() {
             {(trackerView === "active" || trackerView === "live_window") &&
               activeEvent && (
                 <div className="space-y-6">
-                  {/* Hero Tracker Card */}
-                  <div className="bg-[#17191e] border border-white/[0.08] rounded-3xl p-6 sm:p-8 space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      <div className="space-y-1.5">
-                        <h1 className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-white">
-                          {activeEvent.title}
-                        </h1>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-[#9ca3af] font-mono">
-                          <span>
-                            {formatEatDate(activeEvent.starts_at).fullStr}
-                          </span>
-                          <span>·</span>
-                          <a
-                            href={activeEvent.join_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[#4589ff] hover:underline truncate max-w-[260px]"
-                          >
-                            {activeEvent.join_url.replace(/^https?:\/\//, "")}
-                          </a>
-                        </div>
-                      </div>
-
-                      {/* Countdown or LIVE badge */}
-                      {trackerView === "live_window" ? (
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-semibold animate-pulse">
-                          🔴 LIVE: {attendedCount} people joined from WhatsApp
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#25272c] border border-white/[0.08] text-xs font-mono text-white shrink-0">
-                          <Clock className="w-3.5 h-3.5 text-[#4589ff]" />
-                          Starts in {daysLeft}d {hoursLeft}h {minsLeft}m
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Single 3-Step Progress Bar: Setup ✓ -> Leads added ✓ -> Reminders running */}
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="h-1.5 rounded-full bg-[#4589ff]" />
-                        <div
-                          className={`h-1.5 rounded-full ${
-                            totalRegCount > 0 ? "bg-[#4589ff]" : "bg-[#25272c]"
-                          }`}
-                        />
-                        <div
-                          className={`h-1.5 rounded-full ${
-                            activeEvent.is_paid !== false
-                              ? "bg-emerald-400"
-                              : "bg-amber-400"
-                          }`}
-                        />
-                      </div>
-                      <div className="grid grid-cols-3 text-[11px] font-medium text-[#9ca3af]">
-                        <span className="text-white">✓ Setup complete</span>
-                        <span className={totalRegCount > 0 ? "text-white" : ""}>
-                          {totalRegCount > 0
-                            ? `✓ Leads added (${totalRegCount})`
-                            : "○ Add leads"}
-                        </span>
-                        <span
-                          className={
-                            activeEvent.is_paid !== false
-                              ? "text-emerald-400"
-                              : "text-amber-300"
-                          }
-                        >
-                          {activeEvent.is_paid !== false
-                            ? "● Reminders running"
-                            : "⏳ Ready to launch (Unpaid)"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* The 4 Core Numbers */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {[
-                        {
-                          value: totalRegCount,
-                          label: "registered",
-                          highlight: false,
-                        },
-                        {
-                          value: deliveredCount,
-                          label: "delivered",
-                          highlight: false,
-                        },
-                        {
-                          value: confirmedImInCount,
-                          label: '"I\'m in"',
-                          highlight: false,
-                        },
-                        {
-                          value:
-                            trackerView === "live_window" || attendedCount > 0
-                              ? attendedCount
-                              : "—",
-                          label: "joined live",
-                          highlight: trackerView === "live_window",
-                        },
-                      ].map((stat) => (
-                        <div
-                          key={stat.label}
-                          className={`p-4 rounded-2xl border text-center ${
-                            stat.highlight
-                              ? "bg-[#4589ff]/15 border-[#4589ff]/40"
-                              : "bg-[#25272c]/70 border-white/[0.06]"
-                          }`}
-                        >
-                          <div className="font-mono tracking-tight text-2xl sm:text-3xl font-medium text-white">
-                            {stat.value}
-                          </div>
-                          <div className="text-xs text-[#9ca3af] mt-1">
-                            {stat.label}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Single 👉 NEXT Action Card (Always One Clear Action) */}
-                    {activeEvent.is_paid === false ? (
-                      <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="text-xs sm:text-sm font-medium text-white">
-                            👉 NEXT: Activate your 5-stage WhatsApp reminders
-                          </div>
-                          <div className="text-xs text-[#9ca3af]">
-                            {totalRegCount} leads are loaded. Pay KES 1,500 via
-                            M-Pesa to start their automated sequence.
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWizardInitialEvent(activeEvent);
-                            setTrackerView("wizard");
-                          }}
-                          className="px-5 py-2.5 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-xs font-medium text-white shrink-0 transition"
-                        >
-                          Pay KES 1,500 &amp; Launch →
-                        </button>
-                      </div>
-                    ) : trackerView === "live_window" ? (
-                      <div className="p-5 rounded-2xl bg-[#4589ff]/15 border border-[#4589ff]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="text-xs sm:text-sm font-medium text-white">
-                            🔴 Your room is live! Stage 5 join links have been
-                            dispatched.
-                          </div>
-                          <div className="text-xs text-[#9ca3af]">
-                            When your webinar ends, view your attendance lift
-                            and ROI report.
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setTrackerView("finished")}
-                          className="px-5 py-2.5 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-xs font-medium text-white shrink-0 transition"
-                        >
-                          Complete &amp; View Results →
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="p-5 rounded-2xl bg-[#25272c] border border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="text-xs sm:text-sm font-medium text-white">
-                            👉 NEXT: Share your page to get more registrations
-                          </div>
-                          <div className="text-xs font-mono text-[#4589ff]">
-                            {originUrl}/r/{activeEvent.slug}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              copyText(
-                                "nextRegUrl",
-                                `${originUrl}/r/${activeEvent.slug}`
-                              )
-                            }
-                            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-xs font-medium text-white transition"
-                          >
-                            {copiedKey === "nextRegUrl" ? (
-                              <>
-                                <Check className="w-3.5 h-3.5" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5" />
-                                Copy link
-                              </>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setWizardInitialEvent(activeEvent);
-                              setTrackerView("wizard");
-                            }}
-                            className="px-4 py-2.5 rounded-full bg-[#17191e] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-white transition"
-                          >
-                            + Add list
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Clean 5-Stage Vertical Timeline */}
-                    <div className="space-y-3 pt-2">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-medium text-white">
-                          5-Stage WhatsApp Timeline
-                        </h2>
-                        <span className="text-[11px] font-mono text-[#8a909e]">
-                          East Africa Time (EAT)
-                        </span>
-                      </div>
-
-                      <div className="divide-y divide-white/[0.06] rounded-2xl bg-[#101114] border border-white/[0.06] overflow-hidden">
-                        {STAGES_META.map((st) => {
-                          const stageMsgs = eventMessages.filter(
-                            (m) => m.stage === st.key
-                          );
-                          const sentCount = stageMsgs.filter((m) =>
-                            ["sent", "delivered", "read"].includes(m.status)
-                          ).length;
-
-                          const isDone =
-                            st.step <= 2 ||
-                            sentCount > 0 ||
-                            (trackerView === "live_window" && st.step <= 5);
-                          const isNext = !isDone && st.step === 3;
-
-                          return (
-                            <div
-                              key={st.key}
-                              className="px-4 py-3.5 flex items-center justify-between gap-3 text-xs"
-                            >
-                              <div className="flex items-center gap-3">
-                                <span
-                                  className={`w-6 h-6 rounded-full flex items-center justify-center font-mono text-[11px] ${
-                                    isDone
-                                      ? "bg-emerald-500/15 text-emerald-400"
-                                      : isNext
-                                      ? "bg-[#4589ff]/20 text-[#4589ff]"
-                                      : "bg-[#25272c] text-[#8a909e]"
-                                  }`}
-                                >
-                                  {isDone ? "✓" : isNext ? "⏳" : "○"}
-                                </span>
-                                <div>
-                                  <span className="font-medium text-white">
-                                    {st.label}
-                                  </span>
-                                  <span className="text-[#8a909e] ml-2">
-                                    · {st.timing}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-3">
-                                <span className="text-[11px] font-mono text-[#8a909e]">
-                                  {isDone
-                                    ? `${Math.max(sentCount, totalRegCount)} sent`
-                                    : "Scheduled"}
-                                </span>
-                                <button
-                                  type="button"
-                                  disabled={dispatchingStage === st.key}
-                                  onClick={() => handleFireStageNow(st.key)}
-                                  className="text-[11px] text-[#4589ff] hover:underline inline-flex items-center gap-1"
-                                  title="Trigger this stage immediately for demo/testing"
-                                >
-                                  {dispatchingStage === st.key ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <Play className="w-3 h-3" />
-                                  )}
-                                  Send now
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Footer Actions of Tracker Card */}
-                    <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06]">
-                      <button
-                        type="button"
-                        onClick={() => setShowLeadsDrawer((v) => !v)}
-                        className="inline-flex items-center gap-1.5 text-xs text-[#9ca3af] hover:text-white transition"
-                      >
-                        <Users className="w-3.5 h-3.5 text-[#4589ff]" />
-                        {showLeadsDrawer
-                          ? "Hide registrants list"
-                          : `View or add registrants (${totalRegCount})`}
-                        {showLeadsDrawer ? (
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        ) : (
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={sendingPreview}
-                        onClick={handleSendSelfPreview}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#25272c] hover:bg-[#2f3238] text-xs font-medium text-white transition"
-                      >
-                        {sendingPreview ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Send className="w-3.5 h-3.5 text-[#4589ff]" />
-                        )}
-                        Send myself a preview
-                      </button>
-                    </div>
-                  </div>
+                  {/* 21st-Grade Elevated Hero Tracker with Bento Metrics & Interactive Timeline */}
+                  <ElevatedHeroTracker
+                    activeEvent={activeEvent}
+                    eventRegistrants={eventRegistrants}
+                    eventMessages={eventMessages}
+                    trackerView={trackerView}
+                    daysLeft={daysLeft}
+                    hoursLeft={hoursLeft}
+                    minsLeft={minsLeft}
+                    originUrl={originUrl}
+                    dispatchingStage={dispatchingStage}
+                    onFireStageNow={handleFireStageNow}
+                    onOpenLeadsDrawer={() => setShowLeadsDrawer((v) => !v)}
+                    onOpenWizard={() => {
+                      setWizardInitialEvent(activeEvent);
+                      setTrackerView("wizard");
+                    }}
+                    onToast={showToast}
+                  />
 
                   {/* Collapsible Registrants & Quick Add Drawer (Progressive Disclosure) */}
                   {showLeadsDrawer && (
