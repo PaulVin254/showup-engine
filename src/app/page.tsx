@@ -15,7 +15,12 @@ import {
   Smartphone,
   Sparkles,
 } from "lucide-react";
-import { BrandRibbon, BrandWordmark } from "@/components/BrandMark";
+import {
+  BrandRibbon,
+  BrandWordmark,
+  InlineAvatarToken,
+  InlineChartToken,
+} from "@/components/BrandMark";
 import { HeroTestWidget } from "@/components/interactive/HeroTestWidget";
 import { TimelineSequence } from "@/components/ui/TimelineSequence";
 import { ShowupComparison } from "@/components/ui/ShowupComparison";
@@ -31,7 +36,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d0f12] text-slate-100 antialiased selection:bg-emerald-500 selection:text-slate-950 overflow-x-hidden">
+    <div className="min-h-screen bg-[#0d0f12] text-slate-100 antialiased selection:bg-[#1877f2] selection:text-white overflow-x-hidden">
       {/* =================================================================== */}
       {/* MINIMALIST HEADER                                                  */}
       {/* =================================================================== */}
@@ -52,7 +57,7 @@ export default function LandingPage() {
           <Link
             href="/dashboard"
             onClick={() => soundFx.playClick()}
-            className="inline-flex items-center justify-center rounded-xl bg-white hover:bg-slate-200 text-slate-950 font-semibold text-xs px-4 py-2 transition"
+            className="inline-flex items-center justify-center rounded-xl bg-[#1877f2] hover:bg-[#166fe5] text-white font-semibold text-xs px-4 py-2 transition shadow-[0_2px_10px_rgba(24,119,242,0.35)]"
           >
             Open dashboard
           </Link>
@@ -60,10 +65,15 @@ export default function LandingPage() {
       </header>
 
       {/* =================================================================== */}
-      {/* HERO SECTION (NeatMail Minimalist Craft)                           */}
+      {/* HERO SECTION (NeatMail Minimalist Craft + Kenyan Ribbon & Mascot)   */}
       {/* =================================================================== */}
-      <section className="pt-10 sm:pt-16 pb-16 px-4 sm:px-6">
+      <section className="pt-8 sm:pt-14 pb-16 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
+          {/* Free-floating Kenyan Shield-Wave Ribbon Mark */}
+          <div className="mb-5 flex justify-center">
+            <BrandRibbon className="w-16 h-14 sm:w-20 sm:h-18" />
+          </div>
+
           {/* Top Announcement Badge with strictly sized Simba Avatar */}
           <div className="mb-6 flex justify-center">
             <Link
@@ -71,8 +81,8 @@ export default function LandingPage() {
               className="group inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] px-3.5 py-1.5 text-xs text-slate-300 transition-colors"
             >
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1877f2] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1877f2]" />
               </span>
               <span className="w-5 h-5 rounded-full overflow-hidden bg-amber-100/20 shrink-0 inline-block border border-white/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -89,20 +99,22 @@ export default function LandingPage() {
               <span className="hidden sm:inline text-slate-400 font-mono text-[11px]">
                 5-Stage WhatsApp EAT Sequences
               </span>
-              <span className="text-emerald-400 transition-transform group-hover:translate-x-0.5">
+              <span className="text-[#1877f2] transition-transform group-hover:translate-x-0.5">
                 →
               </span>
             </Link>
           </div>
 
-          {/* Clean Geometric Headline with Editorial Italic Emphasis */}
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-semibold tracking-[-0.03em] leading-[1.12] text-white max-w-3xl mx-auto">
-            ShowUp, your Facebook leads
+          {/* Clean Geometric Headline with 3D Simba & Pie-Chart Tokens */}
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-semibold tracking-[-0.03em] leading-[1.14] text-white max-w-3xl mx-auto">
+            ShowUp
+            <InlineAvatarToken variant="simba" />, your Facebook leads
             <br className="hidden sm:inline" />{" "}
             read WhatsApp,{" "}
-            <span className="font-serif italic font-normal text-emerald-400">
-              not email.
+            <span className="font-serif italic font-normal text-[#1877f2]">
+              not email
             </span>
+            <InlineChartToken />
           </h1>
 
           {/* Concise Subtitle */}
@@ -122,7 +134,7 @@ export default function LandingPage() {
       {/* =================================================================== */}
       <section className="py-20 border-y border-white/[0.08]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-4 mb-12">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1877f2]/10 border border-[#1877f2]/20 text-[#1877f2] text-xs font-mono">
             // The Show-Up Lift Gap
           </div>
           <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
@@ -213,7 +225,7 @@ export default function LandingPage() {
               <Link
                 href={setupHref}
                 onClick={() => soundFx.playClick()}
-                className="w-full py-3 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition flex items-center justify-center gap-2"
+                className="w-full py-3 px-6 rounded-xl bg-[#1877f2] hover:bg-[#166fe5] text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(24,119,242,0.35)]"
               >
                 Create your webinar free
                 <ArrowRight className="w-4 h-4" />

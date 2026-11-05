@@ -19,7 +19,7 @@ export function ShowupComparison() {
         </div>
         <div className="text-xl sm:text-2xl font-semibold text-white">
           If you have{" "}
-          <span className="text-emerald-400 font-mono font-bold">
+          <span className="text-[#1877f2] font-mono font-bold">
             {attendeeCount} registrants
           </span>
           :
@@ -150,3 +150,4 @@ export function ShowupComparison() {
     </div>
   );
 }
+

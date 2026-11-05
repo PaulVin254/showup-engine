@@ -88,12 +88,12 @@ export function TimelineSequence() {
               onClick={() => handleStepClick(s.step)}
               className={`p-3 rounded-xl border text-left transition-all ${
                 isSelected
-                  ? "bg-emerald-500/10 border-emerald-500/40 text-white shadow-lg shadow-emerald-500/10"
+                  ? "bg-[#1877f2]/10 border-[#1877f2]/50 text-white shadow-lg shadow-[#1877f2]/15"
                   : "bg-[#14161f] border-white/5 text-slate-400 hover:text-white hover:border-white/10"
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[11px] text-emerald-400 font-semibold">
+                <span className={`font-mono text-[11px] font-semibold ${isSelected ? "text-[#1877f2]" : "text-slate-400"}`}>
                   0{s.step}
                 </span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 font-mono text-slate-400">
@@ -112,7 +112,7 @@ export function TimelineSequence() {
       <div className="neat-card p-6 sm:p-8 grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
         {/* Left: Stage Information */}
         <div className="md:col-span-6 space-y-4 text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1877f2]/10 border border-[#1877f2]/20 text-[#1877f2] text-xs font-mono">
             <Clock className="w-3.5 h-3.5" />
             <span>{currentStage.timeLabel}</span>
             <span>·</span>
@@ -179,3 +179,4 @@ export function TimelineSequence() {
     </div>
   );
 }
+

@@ -37,6 +37,9 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
   const [deliveredWamid, setDeliveredWamid] = useState<string | null>(null);
   const [isCapped, setIsCapped] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [speechText, setSpeechText] = useState(
+    "Jaribu hapa! Send a live WhatsApp test to your phone 👇"
+  );
 
   const sendBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -54,6 +57,14 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
   const handleSelectTopic = (topic: string) => {
     soundFx.playClick();
     setTitle(`${topic}, Sat 7pm`);
+    setSpeechText(`Nice choice! "${topic}" converts 2–3× better on WhatsApp 🔥`);
+  };
+
+  const handlePhoneChange = (val: string) => {
+    setPhone(val);
+    if (val.length > 3 && !resultStatus) {
+      setSpeechText("Looking sharp! Put your Kenyan number 🇰🇪");
+    }
   };
 
   const handleSendTest = async (e: React.FormEvent) => {
@@ -64,6 +75,7 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
     setResultStatus(null);
     setDeliveredWamid(null);
     setIsCapped(false);
+    setSpeechText("Firing Meta Cloud API... ~1.2s delivery ⚡");
 
     try {
       const res = await fetch("/api/whatsapp/test-send", {
@@ -86,7 +98,9 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
       if (data.wamid) setDeliveredWamid(data.wamid);
       if (data.capped) {
         setIsCapped(true);
+        setSpeechText("Daily limit active! 1 live test per number every 24h 🛡️");
       } else {
+        setSpeechText("Boom! Delivered! Check your WhatsApp right now! 🚀🎉");
         soundFx.playWhatsAppPop();
         if (sendBtnRef.current) {
           const rect = sendBtnRef.current.getBoundingClientRect();
@@ -103,16 +117,67 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
         onSuccessToast(data.message || "Test sent to WhatsApp!");
       }
     } catch (err: unknown) {
-      setResultStatus(
-        err instanceof Error ? err.message : "Failed sending live reminder"
-      );
+      const errMessage =
+        err instanceof Error ? err.message : "Failed sending live reminder";
+      setResultStatus(errMessage);
+      setSpeechText("Oops, check your phone digits and try again!");
     } finally {
       setSending(false);
     }
   };
 
   return (
-    <div className="relative max-w-2xl mx-auto mt-8 text-left w-full px-1 sm:px-0">
+    <div className="relative max-w-2xl mx-auto mt-10 text-left w-full px-1 sm:px-0">
+      {/* =================================================================== */}
+      {/* 3D SIMBA MASCOT PEEK + REACTIVE SPEECH BALLOON (Mobile Responsive)  */}
+      {/* =================================================================== */}
+      <div className="flex items-end justify-between px-3 sm:px-4 -mb-3 relative z-10 pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-2.5 sm:gap-3 min-w-0">
+          {/* Tactile 3D Simba Avatar Token */}
+          <div
+            className="w-11 h-11 sm:w-14 sm:h-14 rounded-full overflow-hidden bg-[#e8dfd5] border-2 border-[#2b3545] shadow-[0_6px_16px_rgba(0,0,0,0.5)] select-none shrink-0 transition-transform duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+            onClick={() => {
+              soundFx.playWhatsAppPop();
+              setSpeechText("Simba says: WhatsApp attendance destroys email! 🦁");
+            }}
+            title="Simba Mascot — Click to hear sound"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/tokens/avatar-token.png"
+              alt="Simba Mascot"
+              className="w-full h-full object-cover scale-[1.25] shrink-0"
+            />
+          </div>
+
+          {/* Pillowy Speech Balloon */}
+          <div className="py-1.5 px-3 sm:px-4 rounded-2xl text-[11px] sm:text-xs font-medium text-amber-200 bg-[#161a23]/95 border border-amber-500/30 flex items-center gap-2 shadow-md max-w-[210px] sm:max-w-md">
+            <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 animate-pulse" />
+            <span className="truncate sm:whitespace-normal">{speechText}</span>
+          </div>
+        </div>
+
+        {/* Audio Toggle Pill */}
+        <button
+          type="button"
+          onClick={toggleSound}
+          className="pointer-events-auto text-[11px] font-mono px-2.5 py-1 rounded-full bg-[#161a23]/90 border border-white/10 flex items-center gap-1.5 text-slate-400 hover:text-white transition shrink-0"
+          title={soundEnabled ? "Mute tactile sounds" : "Enable tactile sounds"}
+        >
+          {soundEnabled ? (
+            <>
+              <Volume2 className="w-3.5 h-3.5 text-[#1877f2]" />
+              <span className="hidden sm:inline">Audio On</span>
+            </>
+          ) : (
+            <>
+              <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden sm:inline">Muted</span>
+            </>
+          )}
+        </button>
+      </div>
+
       {/* Main Minimalist Hairline Card Container */}
       <div className="neat-card p-4 sm:p-7 space-y-4 text-slate-100 border-hairline w-full">
         {/* Top Status & Security Bar */}
@@ -123,90 +188,93 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
             <span className="font-medium text-white tracking-tight text-[11px] sm:text-xs">
-              Meta Cloud API Connected
-            </span>
-            <span className="hidden sm:inline font-mono text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              ~1.2s delivery
+              Try it in 10 seconds — no signup required
             </span>
           </div>
 
-          <div className="flex items-center gap-2.5 text-[11px] font-mono text-slate-400">
+          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
             <span className="inline-flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              1 test / 24h
+              Anti-Spam Protected
             </span>
-            <button
-              type="button"
-              onClick={toggleSound}
-              className="hover:text-white transition p-1"
-              title={soundEnabled ? "Mute sounds" : "Unmute sounds"}
-            >
-              {soundEnabled ? (
-                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-              ) : (
-                <VolumeX className="w-3.5 h-3.5 text-slate-500" />
-              )}
-            </button>
           </div>
         </div>
 
         {/* Input Form — Stacks smoothly on Mobile */}
         <form onSubmit={handleSendTest} className="space-y-3">
-          <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
             {/* Phone Input with Kenyan Flag Capsule */}
-            <div className="neat-input flex items-center px-3 py-2.5 flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 pr-2 mr-2 border-r border-white/10 text-xs font-mono text-slate-300 shrink-0">
-                <span className="text-sm">🇰🇪</span>
-                <span className="font-semibold">+254</span>
+            <div className="sm:col-span-5 space-y-1">
+              <label className="block text-[11px] text-slate-400 pl-1">
+                Your WhatsApp number
+              </label>
+              <div className="neat-input flex items-center px-3 py-2.5 min-w-0">
+                <div className="flex items-center gap-1.5 pr-2 mr-2 border-r border-white/10 text-xs font-mono text-slate-300 shrink-0">
+                  <span className="text-sm">🇰🇪</span>
+                  <span className="font-semibold">+254</span>
+                </div>
+                <input
+                  type="tel"
+                  required
+                  placeholder="0712 345 678"
+                  value={phone}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  className="w-full bg-transparent text-white text-xs font-mono placeholder:text-slate-500 focus:outline-none"
+                />
               </div>
-              <input
-                type="tel"
-                required
-                placeholder="712 345 678"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-transparent text-white text-xs font-mono placeholder:text-slate-500 focus:outline-none"
-              />
             </div>
 
             {/* Webinar Title Input */}
-            <div className="neat-input flex items-center px-3 py-2.5 flex-1 min-w-0">
-              <Calendar className="w-3.5 h-3.5 text-emerald-400 mr-2 shrink-0" />
-              <input
-                type="text"
-                required
-                placeholder="Your Webinar Topic"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-transparent text-white text-xs placeholder:text-slate-500 focus:outline-none truncate"
-              />
+            <div className="sm:col-span-4 space-y-1">
+              <label className="block text-[11px] text-slate-400 pl-1">
+                Your webinar or masterclass
+              </label>
+              <div className="neat-input flex items-center px-3 py-2.5 min-w-0">
+                <Calendar className="w-3.5 h-3.5 text-[#1877f2] mr-2 shrink-0" />
+                <input
+                  type="text"
+                  required
+                  placeholder="Free Real Estate Masterclass, Sat 7pm"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full bg-transparent text-white text-xs placeholder:text-slate-500 focus:outline-none truncate"
+                />
+              </div>
             </div>
 
-            {/* High-Contrast Action Button */}
-            <button
-              ref={sendBtnRef}
-              type="submit"
-              disabled={sending}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-slate-950 font-semibold text-xs transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-            >
-              {sending ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Sending...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Send test</span>
-                </>
-              )}
-            </button>
+            {/* Vibrant Electric Blue Action Button */}
+            <div className="sm:col-span-3">
+              <button
+                ref={sendBtnRef}
+                type="submit"
+                disabled={sending}
+                className="w-full py-2.5 px-4 rounded-xl bg-[#1877f2] hover:bg-[#166fe5] active:scale-[0.98] text-white font-medium text-xs sm:text-sm transition-all shadow-[0_4px_14px_rgba(24,119,242,0.35)] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer h-[42px]"
+              >
+                {sending ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Send test</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-form Status Bar */}
+          <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 px-1 pt-0.5">
+            <span>Capped to 1 live reminder per number every 24 hours.</span>
+            <span className="font-mono text-slate-500">Official Meta Cloud API</span>
           </div>
 
           {/* Quick-Pick Topics */}
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 pt-0.5">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 pt-1">
             <span className="flex items-center gap-1 font-medium text-slate-500">
-              <Sparkles className="w-3 h-3 text-emerald-400" /> Try:
+              <Sparkles className="w-3 h-3 text-[#1877f2]" /> Try:
             </span>
             {PRESET_TOPICS.map((topic) => (
               <button
@@ -321,7 +389,7 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
 
           <Link
             href="/dashboard?setup=1"
-            className="text-white hover:text-emerald-400 font-medium inline-flex items-center gap-1 transition group/link"
+            className="text-white hover:text-[#1877f2] font-medium inline-flex items-center gap-1 transition group/link underline underline-offset-4 decoration-white/20 hover:decoration-[#1877f2]"
           >
             Skip test &amp; create your webinar
             <ArrowRight className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 transition-transform" />

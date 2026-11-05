@@ -20,8 +20,8 @@ h2 {
 }
 
 ::selection {
-  background: #10b981;
-  color: #022c22;
+  background: #1877f2;
+  color: #ffffff;
 }
 
 /* ========================================================================= */
@@ -60,8 +60,8 @@ h2 {
 }
 
 .neat-input:focus-within {
-  border-color: #10b981;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  border-color: #1877f2;
+  box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.25);
 }
 
 /* Pulsing dot animation for live status badge */
@@ -95,7 +95,7 @@ input[type="range"] {
   border-radius: 9999px;
   background: #1e222b;
   outline: none;
-  accent-color: #10b981;
+  accent-color: #1877f2;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -104,7 +104,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 18px;
   border-radius: 9999px;
   background: #f8fafc;
-  border: 3px solid #10b981;
+  border: 3px solid #1877f2;
   cursor: pointer;
   transition: transform 0.15s ease;
 }
