@@ -166,21 +166,24 @@ export function ElevatedHeroTracker({
   ];
 
   return (
-    <div className="relative space-y-6">
+    <div className="relative space-y-6 text-slate-100">
       {/* =================================================================== */}
-      {/* MAIN MOLDED CLAY CONSOLE (ZERO GLASSMORPHISM)                     */}
+      {/* MAIN MINIMALIST CONSOLE CARD                                       */}
       {/* =================================================================== */}
-      <div className="clay-deck p-6 sm:p-8 space-y-6 text-slate-100">
+      <div className="neat-card p-6 sm:p-8 space-y-6">
         {/* Header: Title, Link & Timing Pill */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-2 border-b border-[#232733]">
-          <div className="space-y-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-white/[0.08]">
+          <div className="space-y-1.5 text-left">
             <div className="flex items-center gap-2">
-              <span className="clay-led-green animate-pulse" />
-              <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wider">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-[11px] font-mono font-medium text-slate-400 uppercase tracking-wider">
                 Live Console · Meta Cloud API
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
               {activeEvent.title}
             </h1>
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-mono">
@@ -200,14 +203,14 @@ export function ElevatedHeroTracker({
             </div>
           </div>
 
-          {/* Dynamic Timing Chip (Tactile Clay Pill) */}
+          {/* Dynamic Timing Chip */}
           {trackerView === "live_window" ? (
-            <div className="clay-badge inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-red-500/50 text-red-300 text-xs font-bold animate-pulse shrink-0">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-semibold animate-pulse shrink-0">
+              <span className="w-2 h-2 rounded-full bg-red-500" />
               🔴 LIVE: {attendedCount} people joined via WhatsApp
             </div>
           ) : (
-            <div className="clay-badge inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-mono font-medium text-white shrink-0">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-xs font-mono text-slate-300 shrink-0">
               <Clock className="w-3.5 h-3.5 text-emerald-400" />
               <span>
                 Starts in {daysLeft}d {hoursLeft}h {minsLeft}m
@@ -217,25 +220,23 @@ export function ElevatedHeroTracker({
         </div>
 
         {/* 3-Step Lifecycle Status Track */}
-        <div className="space-y-2 p-3 clay-inset rounded-2xl">
+        <div className="space-y-2 p-3 rounded-xl bg-white/[0.02] border border-white/5">
           <div className="grid grid-cols-3 gap-2">
-            <div className="h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#22c55e]" />
+            <div className="h-1.5 rounded-full bg-emerald-500" />
             <div
-              className={`h-2 rounded-full ${
-                totalRegCount > 0
-                  ? "bg-emerald-500 shadow-[0_0_8px_#22c55e]"
-                  : "bg-[#252830]"
+              className={`h-1.5 rounded-full ${
+                totalRegCount > 0 ? "bg-emerald-500" : "bg-white/10"
               }`}
             />
             <div
-              className={`h-2 rounded-full ${
+              className={`h-1.5 rounded-full ${
                 activeEvent.is_paid !== false
-                  ? "bg-emerald-400 shadow-[0_0_8px_#34d399]"
+                  ? "bg-emerald-400"
                   : "bg-amber-400"
               }`}
             />
           </div>
-          <div className="grid grid-cols-3 text-[11px] font-semibold text-slate-400 pt-1">
+          <div className="grid grid-cols-3 text-[11px] font-medium text-slate-400 pt-1">
             <span className="text-white">✓ Room active</span>
             <span className={totalRegCount > 0 ? "text-white" : ""}>
               {totalRegCount > 0
@@ -257,17 +258,17 @@ export function ElevatedHeroTracker({
         </div>
 
         {/* ================================================================= */}
-        {/* CHUNKY 3D TACTILE BENTO METRIC TILES                             */}
+        {/* REFINED BENTO METRIC TILES                                        */}
         {/* ================================================================= */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-left">
           {/* Tile 1: Registered Leads */}
-          <div className="clay-card clay-card-hover p-4 space-y-2">
+          <div className="p-4 rounded-xl bg-[#161820] border border-white/[0.06] space-y-2">
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="flex items-center gap-1.5 font-medium text-slate-200">
-                <Users className="w-4 h-4 text-blue-400" />
+              <span className="flex items-center gap-1.5 font-medium text-slate-300">
+                <Users className="w-4 h-4 text-emerald-400" />
                 Registrants
               </span>
-              <span className="clay-badge text-[10px] px-2 py-0.5 rounded-full text-slate-300 font-mono">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-slate-400 font-mono">
                 Total
               </span>
             </div>
@@ -275,18 +276,18 @@ export function ElevatedHeroTracker({
               {totalRegCount}
             </div>
             <div className="text-[11px] text-slate-400">
-              WhatsApp verified Kenyan leads
+              WhatsApp verified leads
             </div>
           </div>
 
           {/* Tile 2: WhatsApp Delivered */}
-          <div className="clay-card clay-card-hover p-4 space-y-2">
+          <div className="p-4 rounded-xl bg-[#161820] border border-white/[0.06] space-y-2">
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="flex items-center gap-1.5 font-medium text-slate-200">
+              <span className="flex items-center gap-1.5 font-medium text-slate-300">
                 <Smartphone className="w-4 h-4 text-emerald-400" />
                 Delivered
               </span>
-              <span className="clay-badge text-[10px] px-2 py-0.5 rounded-full text-emerald-400 font-mono">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono">
                 98% rate
               </span>
             </div>
@@ -299,13 +300,13 @@ export function ElevatedHeroTracker({
           </div>
 
           {/* Tile 3: Confirmed High Intent */}
-          <div className="clay-card clay-card-hover p-4 space-y-2">
+          <div className="p-4 rounded-xl bg-[#161820] border border-white/[0.06] space-y-2">
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="flex items-center gap-1.5 font-medium text-slate-200">
+              <span className="flex items-center gap-1.5 font-medium text-slate-300">
                 <Calendar className="w-4 h-4 text-amber-400" />
                 Committed
               </span>
-              <span className="clay-badge text-[10px] px-2 py-0.5 rounded-full text-amber-300 font-mono">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-mono">
                 High intent
               </span>
             </div>
@@ -317,14 +318,14 @@ export function ElevatedHeroTracker({
             </div>
           </div>
 
-          {/* Tile 4: Show-Up Jump Lift (Hero Stat) */}
-          <div className="clay-card clay-card-hover p-4 space-y-2 border-2 border-emerald-500/40 bg-[#16231d]">
+          {/* Tile 4: Show-Up Lift (Hero Stat) */}
+          <div className="p-4 rounded-xl bg-[#0e1713] border border-emerald-500/30 space-y-2">
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span className="flex items-center gap-1.5 font-semibold text-white">
                 <TrendingUp className="w-4 h-4 text-emerald-400" />
                 Show-Up Lift
               </span>
-              <span className="clay-badge text-[10px] px-2 py-0.5 rounded-full text-emerald-300 font-mono font-bold">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold">
                 +{liftPct}% lift
               </span>
             </div>
@@ -344,7 +345,7 @@ export function ElevatedHeroTracker({
 
         {/* Action Prompt Banner */}
         {activeEvent.is_paid === false ? (
-          <div className="clay-card p-5 border-2 border-amber-500/40 bg-[#241a12] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
             <div className="space-y-1">
               <div className="text-xs sm:text-sm font-semibold text-white flex items-center gap-2">
                 <Flame className="w-4 h-4 text-amber-400" />
@@ -361,13 +362,13 @@ export function ElevatedHeroTracker({
                 soundFx.playClick();
                 onOpenWizard();
               }}
-              className="clay-btn-emerald px-6 py-2.5 rounded-full text-xs font-bold text-white shrink-0 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold shrink-0 cursor-pointer transition shadow-md"
             >
               Pay KES 1,500 &amp; Launch →
             </button>
           </div>
         ) : (
-          <div className="clay-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#161820] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
             <div className="space-y-1">
               <div className="text-xs sm:text-sm font-semibold text-white">
                 Share your live registration page
@@ -380,7 +381,7 @@ export function ElevatedHeroTracker({
               <button
                 type="button"
                 onClick={copyRegUrl}
-                className="clay-btn-emerald inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold text-white cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold cursor-pointer transition"
               >
                 {copiedLink ? (
                   <>
@@ -399,7 +400,7 @@ export function ElevatedHeroTracker({
                   soundFx.playClick();
                   onOpenWizard();
                 }}
-                className="clay-btn-charcoal px-4 py-2 rounded-full text-xs text-white cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-white cursor-pointer transition"
               >
                 + Add more leads
               </button>
@@ -410,11 +411,11 @@ export function ElevatedHeroTracker({
         {/* ================================================================= */}
         {/* INTERACTIVE 5-STAGE SEQUENCE PIPELINE                             */}
         {/* ================================================================= */}
-        <div className="space-y-3 pt-2">
+        <div className="space-y-3 pt-2 text-left">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm font-bold text-white">
+              <h2 className="text-sm font-semibold text-white">
                 5-Stage WhatsApp Sequence Track
               </h2>
             </div>
@@ -423,7 +424,7 @@ export function ElevatedHeroTracker({
             </span>
           </div>
 
-          <div className="clay-inset divide-y divide-[#1e232f] overflow-hidden">
+          <div className="rounded-2xl border border-white/10 divide-y divide-white/5 overflow-hidden bg-[#161820]">
             {STAGES_CONFIG.map((st) => {
               const isExpanded = expandedStage === st.key;
               const stageMsgs = eventMessages.filter((m) => m.stage === st.key);
@@ -441,22 +442,22 @@ export function ElevatedHeroTracker({
                 <div key={st.key} className="transition-colors">
                   <div
                     onClick={() => handleToggleStage(st.key)}
-                    className="px-4 py-3.5 flex items-center justify-between gap-3 text-xs cursor-pointer hover:bg-white/[0.03]"
+                    className="px-4 py-3.5 flex items-center justify-between gap-3 text-xs cursor-pointer hover:bg-white/[0.02]"
                   >
                     <div className="flex items-center gap-3">
                       <span
-                        className={`w-7 h-7 rounded-full flex items-center justify-center font-mono text-xs font-bold shadow-sm ${
+                        className={`w-6 h-6 rounded-full flex items-center justify-center font-mono text-xs font-semibold ${
                           isDone
                             ? "bg-emerald-500 text-slate-950"
                             : isNext
                             ? "bg-amber-400 text-slate-950"
-                            : "bg-[#1c1e24] text-slate-400"
+                            : "bg-white/10 text-slate-400"
                         }`}
                       >
                         {isDone ? "✓" : isNext ? "⏳" : st.step}
                       </span>
                       <div>
-                        <span className="font-semibold text-white">
+                        <span className="font-medium text-white">
                           {st.label}
                         </span>
                         <span className="text-slate-400 ml-2 font-mono text-[11px]">
@@ -480,7 +481,7 @@ export function ElevatedHeroTracker({
                           soundFx.playClick();
                           onFireStageNow(st.key);
                         }}
-                        className="clay-btn-charcoal text-[11px] px-2.5 py-1 rounded-md text-emerald-400 hover:text-white inline-flex items-center gap-1 font-mono cursor-pointer"
+                        className="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[11px] text-emerald-400 hover:text-white inline-flex items-center gap-1 font-mono cursor-pointer transition border border-white/5"
                         title="Trigger this stage now to test on WhatsApp"
                       >
                         {dispatchingStage === st.key ? (
@@ -503,11 +504,11 @@ export function ElevatedHeroTracker({
 
                   {/* Expandable WhatsApp Bubble Drawer */}
                   {isExpanded && (
-                    <div className="px-5 pb-4 pt-2 bg-[#090b0e] border-t border-[#1a1e27] space-y-2">
+                    <div className="px-5 pb-4 pt-2 bg-[#0d0f14] border-t border-white/5 space-y-2">
                       <div className="text-[11px] font-mono text-slate-400">
                         Personalized message delivered to each lead:
                       </div>
-                      <div className="clay-bubble-wa max-w-md p-3.5 text-xs text-[#e9edef] space-y-2 shadow-md">
+                      <div className="max-w-md rounded-2xl rounded-tl-sm bg-[#1f2c34] p-3.5 text-xs text-[#e9edef] space-y-2 shadow-md border border-white/5">
                         <p className="whitespace-pre-wrap leading-relaxed">
                           {renderTemplatePreview(
                             st.previewTemplate,
@@ -528,7 +529,7 @@ export function ElevatedHeroTracker({
         </div>
 
         {/* Footer Actions */}
-        <div className="pt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#232733] text-xs">
+        <div className="pt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] text-xs">
           <button
             type="button"
             onClick={() => {

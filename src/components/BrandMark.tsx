@@ -120,13 +120,13 @@ export function InlineAvatarToken({
   return (
     <span
       title="ShowUp Kenya Mascot"
-      className="inline-flex items-center justify-center align-middle mx-1.5 -mt-1.5 w-11 h-11 sm:w-14 sm:h-14 md:w-[62px] md:h-[62px] rounded-full overflow-hidden bg-[#e8dfd5] shadow-[0_4px_14px_rgba(0,0,0,0.45)] select-none shrink-0 transition-transform duration-200 hover:scale-105"
+      className="inline-flex items-center justify-center align-middle mx-1 w-6 h-6 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-[#e8dfd5] select-none shrink-0"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt="ShowUp Kenyan Mascot"
-        className="w-full h-full object-cover scale-[1.24]"
+        className="w-full h-full object-cover"
       />
     </span>
   );
@@ -137,12 +137,12 @@ export function InlineAvatarToken({
  */
 export function InlineChartToken() {
   return (
-    <span className="inline-flex items-center justify-center align-middle ml-2 -mt-1.5 w-12 h-12 sm:w-14 sm:h-14 md:w-[64px] md:h-[64px] rounded-full overflow-hidden select-none shrink-0 transition-transform duration-200 hover:scale-105">
+    <span className="inline-flex items-center justify-center align-middle ml-1.5 w-6 h-6 sm:w-8 sm:h-8 rounded-full overflow-hidden select-none shrink-0">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/tokens/chart-token.png"
         alt=""
-        className="w-full h-full object-cover scale-[1.32]"
+        className="w-full h-full object-cover"
       />
     </span>
   );

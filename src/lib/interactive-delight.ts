@@ -204,3 +204,4 @@ export function fireTactileConfetti(targetX?: number, targetY?: number) {
 
   render();
 }
+
