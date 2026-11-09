@@ -24,6 +24,11 @@ import {
 import { HeroTestWidget } from "@/components/interactive/HeroTestWidget";
 import { TimelineSequence } from "@/components/ui/TimelineSequence";
 import { ShowupComparison } from "@/components/ui/ShowupComparison";
+import { CreatorResults } from "@/components/ui/CreatorResults";
+import { ObjectionFaq } from "@/components/ui/ObjectionFaq";
+import { AvatarStack } from "@/components/ui/AvatarStack";
+import { DoodleCharacter } from "@/components/ui/Doodle";
+import { faqItems, sampleResults } from "@/data/landing";
 import { soundFx } from "@/lib/interactive-delight";
 
 export default function LandingPage() {
@@ -126,6 +131,10 @@ export default function LandingPage() {
 
           {/* Minimalist Hairline Hero Test Widget */}
           <HeroTestWidget onSuccessToast={showToast} />
+
+          <div className="mt-8 flex justify-center">
+            <AvatarStack />
+          </div>
         </div>
       </section>
 
@@ -174,9 +183,30 @@ export default function LandingPage() {
       </section>
 
       {/* =================================================================== */}
+      {/* CREATOR RESULTS (sample data until real testimonials are collected) */}
+      {/* =================================================================== */}
+      <section id="results" className="py-20 border-t border-white/[0.08]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-4 mb-10">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
+            // Creator Results
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
+            From 18% to 54% in the room
+          </h2>
+          <p className="text-sm text-slate-400 max-w-xl mx-auto">
+            Illustrative sample results for Nairobi creators across real estate,
+            forex, e-commerce and consulting.
+          </p>
+        </div>
+        <div className="px-4 sm:px-6">
+          <CreatorResults results={sampleResults} ctaHref="#pricing" ctaLabel="See the launch pass" />
+        </div>
+      </section>
+
+      {/* =================================================================== */}
       {/* MINIMALIST PRICING (KES 1,500 Launch Pass)                         */}
       {/* =================================================================== */}
-      <section className="py-20 border-t border-white/[0.08]">
+      <section id="pricing" className="py-20 border-t border-white/[0.08]">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-10 space-y-3">
             <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
@@ -235,6 +265,26 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+          <div className="mt-4 flex justify-center sm:justify-end sm:pr-4">
+            <DoodleCharacter caption="Zero monthly lock-in · Pay only when you launch!" />
+          </div>
+        </div>
+      </section>
+
+      {/* =================================================================== */}
+      {/* OBJECTION FAQ                                                      */}
+      {/* =================================================================== */}
+      <section id="faq" className="py-20 border-t border-white/[0.08]">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center space-y-4 mb-10">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-xs font-mono">
+            // Before you launch
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
+            Questions Kenyan hosts ask first
+          </h2>
+        </div>
+        <div className="px-4 sm:px-6">
+          <ObjectionFaq items={faqItems} defaultOpenId="mpesa" />
         </div>
       </section>
 
@@ -247,8 +297,19 @@ export default function LandingPage() {
       )}
 
       {/* Footer */}
-      <footer className="py-10 border-t border-white/[0.08] text-center text-xs text-slate-500 font-mono">
-        ShowUp Engine · Built for Kenya &amp; Africa · Official Meta WhatsApp Cloud API
+      <footer className="py-10 border-t border-white/[0.08] text-center text-xs text-slate-500 font-mono space-y-2">
+        <div>
+          ShowUp Engine · Built for Kenya &amp; Africa · Official Meta WhatsApp Cloud API
+        </div>
+        <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400">
+          <Link href="/privacy" className="hover:text-white transition">
+            Privacy Policy
+          </Link>
+          <span>·</span>
+          <Link href="/terms" className="hover:text-white transition">
+            Terms of Service
+          </Link>
+        </div>
       </footer>
 
       {/* Cloudflare Turnstile Script */}

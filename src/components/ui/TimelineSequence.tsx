@@ -34,7 +34,7 @@ const STAGES = [
     title: "1-Click Google Calendar Lock",
     desc: "A quick follow-up with a direct Google Calendar lock link to prevent double-booking on webinar day.",
     previewText:
-      "Quick tip Brian 📅 Lock *Nairobi Real Estate Masterclass* into your Google Calendar so you don't double-book:\n\n👉 https://showup.sitesync.tech/cal\n\nStarts Saturday at 7:00 PM (EAT). See you inside!",
+      "Quick tip Brian 📅 Lock *Nairobi Real Estate Masterclass* into your Google Calendar so you don't double-book:\n\n👉 https://showup.eris.co.ke/cal\n\nStarts Saturday at 7:00 PM (EAT). See you inside!",
   },
   {
     step: 3,

@@ -2,7 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import {
+  Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   KeyRound,
   Loader2,
@@ -44,13 +47,20 @@ export function EmbeddedSignupModal({
   defaultAppId,
   onConnected,
 }: EmbeddedSignupModalProps) {
-  const [activeTab, setActiveTab] = useState<"embedded" | "direct">("embedded");
+  const [showDevTools, setShowDevTools] = useState(false);
+  const [devTab, setDevTab] = useState<"config" | "direct">("config");
   const [appId, setAppId] = useState(defaultAppId || "946759377779936");
   const [configId, setConfigId] = useState(defaultConfigId || "1433645942194259");
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+
+  // Sync defaults if parent state updates from /api/state
+  useEffect(() => {
+    if (defaultAppId) setAppId(defaultAppId);
+    if (defaultConfigId) setConfigId(defaultConfigId);
+  }, [defaultAppId, defaultConfigId]);
 
   // Direct / Developer token inputs
   const [manualWabaId, setManualWabaId] = useState(tenant.waba_id || "");
@@ -108,7 +118,7 @@ export function EmbeddedSignupModal({
               setManualPhoneId(phone_number_id);
             }
 
-            const captured = `Captured WABA ID: ${waba_id} | Phone ID: ${phone_number_id}`;
+            const captured = `Verified WABA (${waba_id}) & Phone ID (${phone_number_id})`;
             setStatusMessage(captured);
             addLog(`SUCCESS: ${captured}`);
           }
@@ -126,7 +136,7 @@ export function EmbeddedSignupModal({
     return new Promise((resolve, reject) => {
       const cleanAppId = targetAppId.trim();
       if (!cleanAppId) {
-        const err = "Please enter your Meta App ID first.";
+        const err = "Meta App ID is missing. Open Developer Diagnostics to configure.";
         addLog(`ERROR: ${err}`);
         reject(new Error(err));
         return;
@@ -140,9 +150,9 @@ export function EmbeddedSignupModal({
             autoLogAppEvents: true,
             cookie: true,
             xfbml: true,
-            version: "v26.0",
+            version: "v21.0",
           });
-          addLog("FB SDK initialized successfully (v26.0)");
+          addLog("FB SDK initialized successfully");
           resolve();
           return;
         } catch (initErr) {
@@ -160,9 +170,9 @@ export function EmbeddedSignupModal({
             autoLogAppEvents: true,
             cookie: true,
             xfbml: true,
-            version: "v26.0",
+            version: "v21.0",
           });
-          addLog("FB SDK init complete via fbAsyncInit (v26.0)");
+          addLog("FB SDK init complete via fbAsyncInit");
           resolve();
         } catch (e) {
           addLog("Error inside fbAsyncInit:", e);
@@ -197,7 +207,7 @@ export function EmbeddedSignupModal({
     const cleanConfigId = configId.trim();
 
     if (!cleanAppId) {
-      const msg = "Enter your Meta App ID above so Facebook Login can initialize.";
+      const msg = "Meta App ID is not configured. Open Developer Diagnostics below.";
       setError(msg);
       addLog(`VALIDATION: ${msg}`);
       return;
@@ -232,7 +242,6 @@ export function EmbeddedSignupModal({
 
         addLog("Calling window.FB.login with options:", loginOptions);
 
-        // Standard function callback to satisfy Meta's legacy validator
         window.FB.login(
           function (response) {
             addLog("FB.login response received:", response);
@@ -251,7 +260,7 @@ export function EmbeddedSignupModal({
               });
 
               setStatusMessage(
-                "Exchanging authorization code & provisioning 5 Webinar Templates..."
+                "Completing WhatsApp Business verification & provisioning your 5 webinar templates..."
               );
 
               fetch("/api/whatsapp/embedded-signup/callback", {
@@ -284,7 +293,7 @@ export function EmbeddedSignupModal({
                 });
             } else {
               setLoading(false);
-              const cancelMsg = "Popup closed before authorization completed.";
+              const cancelMsg = "Facebook window closed before authorization completed.";
               addLog(`INFO: ${cancelMsg}`);
               setStatusMessage(cancelMsg);
             }
@@ -368,57 +377,33 @@ export function EmbeddedSignupModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-surface border border-white/[0.08] rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl my-6">
+      <div className="bg-[#12141a] border border-white/[0.08] rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl my-6">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-canvas/60">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-[#0d0f12]/70">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-electric-subtle border border-electric/30 flex items-center justify-center text-electric-hover">
+            <div className="w-10 h-10 rounded-xl bg-[#1877f2]/15 border border-[#1877f2]/30 flex items-center justify-center text-[#1877f2]">
               <Smartphone className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">
-                Connect Official WhatsApp Business API
+              <h3 className="text-base sm:text-lg font-semibold text-white">
+                Connect Your WhatsApp Business Number
               </h3>
-              <p className="text-xs text-[#94a3b8]">
-                Meta Tech Provider Embedded Signup • Zero Ban Risk • Auto-Template Provisioning
+              <p className="text-xs text-slate-400">
+                Official Meta Cloud API · Zero Ban Risk · Auto-Template Setup
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-[#94a3b8] hover:text-white p-1.5 rounded-lg hover:bg-white/[0.08]"
+            aria-label="Close modal"
+            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/[0.08]"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Mode Switcher */}
-        <div className="px-6 pt-4 flex gap-2 border-b border-white/[0.08]">
-          <button
-            onClick={() => setActiveTab("embedded")}
-            className={`pb-3 px-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-              activeTab === "embedded"
-                ? "border-electric text-electric-hover"
-                : "border-transparent text-[#94a3b8] hover:text-slate-200"
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            1-Click Meta Embedded Signup
-          </button>
-          <button
-            onClick={() => setActiveTab("direct")}
-            className={`pb-3 px-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-              activeTab === "direct"
-                ? "border-electric text-electric-hover"
-                : "border-transparent text-[#94a3b8] hover:text-slate-200"
-            }`}
-          >
-            <KeyRound className="w-4 h-4" />
-            Direct System Token / Localhost Test
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
+        {/* Customer-Ready 1-Click Onboarding Body */}
+        <div className="p-6 space-y-5">
           {error && (
             <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
               {error}
@@ -426,214 +411,303 @@ export function EmbeddedSignupModal({
           )}
 
           {statusMessage && (
-            <div className="p-3.5 rounded-xl bg-electric-subtle border border-electric/30 text-[#7db4ff] text-xs flex items-center gap-2">
+            <div className="p-3.5 rounded-xl bg-[#1877f2]/10 border border-[#1877f2]/30 text-[#7db4ff] text-xs flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>{statusMessage}</span>
             </div>
           )}
 
-          {activeTab === "embedded" ? (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-canvas border border-white/[0.08] space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-electric-hover">
-                    Your Live Meta Embedded Signup Config
-                  </span>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-electric-subtle text-[#7db4ff] border border-electric/30">
-                    Tech Provider Verified
-                  </span>
-                </div>
+          {/* 3-Step Visual Onboarding Guide */}
+          <div className="rounded-2xl bg-[#0d0f12] border border-white/[0.08] p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+                <ShieldCheck className="w-4 h-4 text-[#00a884]" />
+                Official Meta Tech Provider Onboarding
+              </span>
+              <span className="text-[11px] font-mono text-slate-400">
+                ~60 seconds
+              </span>
+            </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-[#94a3b8] mb-1">
-                      Configuration ID
-                    </label>
-                    <input
-                      type="text"
-                      value={configId}
-                      onChange={(e) => setConfigId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-full bg-surface border border-white/[0.08] text-white text-sm font-mono focus:outline-none focus:border-electric"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-[#94a3b8] mb-1">
-                      Meta App ID
-                    </label>
-                    <input
-                      type="text"
-                      value={appId}
-                      onChange={(e) => setAppId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-full bg-surface border border-white/[0.08] text-white text-sm font-mono focus:outline-none focus:border-electric"
-                    />
-                  </div>
+            <ol className="space-y-3 text-xs sm:text-sm text-slate-300">
+              <li className="flex items-start gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1877f2]/20 text-[#60a5fa] font-mono text-[11px] font-bold mt-0.5">
+                  1
+                </span>
+                <div>
+                  <span className="font-medium text-white">Log in with Facebook</span>{" "}
+                  and select your Meta Business Portfolio in the secure Meta popup.
                 </div>
-
-                <div className="flex items-center justify-between text-[11px] text-[#94a3b8] pt-1">
-                  <span>Origin: <code className="text-[#7db4ff]">{typeof window !== "undefined" ? window.location.origin : ""}</code></span>
-                  <a
-                    href={directMetaHostedUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-electric-hover hover:underline flex items-center gap-1 font-semibold"
-                  >
-                    Open Meta-Hosted Onboarding URL
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1877f2]/20 text-[#60a5fa] font-mono text-[11px] font-bold mt-0.5">
+                  2
+                </span>
+                <div>
+                  <span className="font-medium text-white">Select or verify your WhatsApp number</span>{" "}
+                  that will appear on your attendees&apos; phones.
                 </div>
-              </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1877f2]/20 text-[#60a5fa] font-mono text-[11px] font-bold mt-0.5">
+                  3
+                </span>
+                <div>
+                  <span className="font-medium text-white">Automatic 5-Stage Template Provisioning:</span>{" "}
+                  ShowUp automatically installs your 5 East Africa Time (EAT) webinar reminder templates.
+                </div>
+              </li>
+            </ol>
 
-              {/* In-App Live Debug Console */}
-              <div className="p-3.5 rounded-xl bg-canvas border border-white/[0.08] space-y-2">
-                <div className="flex items-center justify-between text-xs text-[#94a3b8]">
-                  <span className="flex items-center gap-1.5 font-mono text-[11px] text-[#94a3b8]">
-                    <Terminal className="w-3.5 h-3.5 text-electric-hover" />
-                    Live Debug Event Stream (Check F12 Console for full logs)
-                  </span>
+            <div className="pt-2 flex flex-wrap items-center gap-4 border-t border-white/[0.06] text-[11px] text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-[#00a884]" />
+                No coding or API keys needed
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-[#00a884]" />
+                Disconnect anytime
+              </span>
+            </div>
+          </div>
+
+          {/* Primary 1-Click Action Button */}
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={launchEmbeddedSignupPopup}
+              disabled={loading}
+              className="w-full py-3.5 px-6 rounded-xl font-semibold text-sm text-white bg-[#1877f2] hover:bg-[#166fe5] transition flex items-center justify-center gap-2.5 shadow-[0_4px_14px_rgba(24,119,242,0.35)] disabled:opacity-50"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              Continue with Facebook (1-Click Setup)
+            </button>
+
+            <div className="text-center text-[11px] text-slate-500">
+              Don&apos;t have a dedicated WhatsApp Business number yet? You can close this window and send immediately using{" "}
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-slate-300 underline hover:text-white"
+              >
+                ShowUp&apos;s Verified Shared Sender
+              </button>
+              .
+            </div>
+          </div>
+
+          {/* Collapsible Developer & App Review Diagnostics Drawer */}
+          <div className="pt-2 border-t border-white/[0.06]">
+            <button
+              type="button"
+              onClick={() => setShowDevTools((v) => !v)}
+              className="w-full flex items-center justify-between text-[11px] font-mono text-slate-500 hover:text-slate-300 py-1 transition"
+            >
+              <span className="flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5" />
+                Developer &amp; App Review Diagnostics
+              </span>
+              {showDevTools ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {showDevTools && (
+              <div className="mt-3 space-y-4 rounded-2xl bg-[#0d0f12] border border-white/[0.08] p-4">
+                <div className="flex gap-2 border-b border-white/[0.08] pb-2 text-xs">
                   <button
                     type="button"
-                    onClick={() => setLogs([])}
-                    className="text-[10px] text-[#64748b] hover:text-[#94a3b8]"
+                    onClick={() => setDevTab("config")}
+                    className={`px-3 py-1 rounded-lg font-mono text-[11px] ${
+                      devTab === "config"
+                        ? "bg-[#1877f2]/20 text-[#60a5fa] border border-[#1877f2]/30"
+                        : "text-slate-400 hover:text-white"
+                    }`}
                   >
-                    Clear Logs
+                    Meta Config &amp; Logs
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDevTab("direct")}
+                    className={`px-3 py-1 rounded-lg font-mono text-[11px] flex items-center gap-1 ${
+                      devTab === "direct"
+                        ? "bg-[#1877f2]/20 text-[#60a5fa] border border-[#1877f2]/30"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <KeyRound className="w-3 h-3" />
+                    Direct System Token / Sandbox
                   </button>
                 </div>
-                <div className="h-28 overflow-y-auto font-mono text-[11px] text-[#94a3b8] bg-black/60 p-2.5 rounded-lg border border-white/[0.07] space-y-1">
-                  {logs.length === 0 ? (
-                    <span className="text-[#64748b]">Waiting for actions... click &quot;Launch Meta Embedded Signup&quot; to begin.</span>
-                  ) : (
-                    logs.map((log, i) => (
-                      <div key={i} className="leading-tight break-all">
-                        {log}
+
+                {devTab === "config" ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                          Configuration ID (Tech Provider)
+                        </label>
+                        <input
+                          type="text"
+                          value={configId}
+                          onChange={(e) => setConfigId(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#171a22] border border-white/10 text-white text-xs font-mono"
+                        />
                       </div>
-                    ))
-                  )}
-                </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1 font-mono">
+                          Meta App ID (Tech Provider)
+                        </label>
+                        <input
+                          type="text"
+                          value={appId}
+                          onChange={(e) => setAppId(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#171a22] border border-white/10 text-white text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                      <span>
+                        Origin:{" "}
+                        <code className="text-[#60a5fa]">
+                          {typeof window !== "undefined" ? window.location.origin : ""}
+                        </code>
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleDirectTokenConnect(true)}
+                          disabled={loading}
+                          className="text-slate-400 hover:text-white underline font-mono"
+                        >
+                          Activate Sandbox Demo WABA
+                        </button>
+                        <a
+                          href={directMetaHostedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#60a5fa] hover:underline inline-flex items-center gap-1 font-mono"
+                        >
+                          Meta-Hosted URL
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                        <span>Live Event Stream</span>
+                        <button
+                          type="button"
+                          onClick={() => setLogs([])}
+                          className="text-[10px] text-slate-500 hover:text-slate-300"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="h-24 overflow-y-auto font-mono text-[11px] text-slate-400 bg-black/60 p-2.5 rounded-lg border border-white/[0.07] space-y-1">
+                        {logs.length === 0 ? (
+                          <span className="text-slate-600">
+                            Waiting for Embedded Signup events...
+                          </span>
+                        ) : (
+                          logs.map((log, i) => (
+                            <div key={i} className="leading-tight break-all">
+                              {log}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">
+                          WABA ID
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 104928172635412"
+                          value={manualWabaId}
+                          onChange={(e) => setManualWabaId(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#171a22] border border-white/10 text-white text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">
+                          Phone Number ID
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 109827364519283"
+                          value={manualPhoneId}
+                          onChange={(e) => setManualPhoneId(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#171a22] border border-white/10 text-white text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">
+                          Display Phone Number
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="+254 712 345 678"
+                          value={manualDisplayPhone}
+                          onChange={(e) => setManualDisplayPhone(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#171a22] border border-white/10 text-white text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">
+                          System User Access Token
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="EAAG..."
+                          value={manualToken}
+                          onChange={(e) => setManualToken(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#171a22] border border-white/10 text-white text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDirectTokenConnect(true)}
+                        disabled={loading}
+                        className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-xs text-slate-300"
+                      >
+                        Use Sandbox Demo
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDirectTokenConnect(false)}
+                        disabled={loading}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-semibold text-xs text-white bg-[#1877f2] hover:bg-[#166fe5] transition"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Connect &amp; Provision 5 Templates
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => handleDirectTokenConnect(true)}
-                  disabled={loading}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-full border border-white/[0.08] hover:bg-white/[0.08] text-xs font-medium text-[#94a3b8] transition"
-                >
-                  Activate Sandbox Demo WABA
-                </button>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <a
-                    href={directMetaHostedUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full border border-electric/30 text-[#7db4ff] hover:bg-electric/20 text-xs font-semibold transition"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Open Meta Hosted Page
-                  </a>
-
-                  <button
-                    type="button"
-                    onClick={launchEmbeddedSignupPopup}
-                    disabled={loading}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm text-white bg-electric hover:bg-electric-hover transition shadow-lg shadow-[#0064e0]/20 disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <ExternalLink className="w-4 h-4" />
-                    )}
-                    Launch Meta Embedded Signup
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-xs text-[#94a3b8]">
-                Use this tab to connect via a direct System User Token (for Concierge Pilots #1–5).
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-[#94a3b8] mb-1">
-                    WhatsApp Business Account ID (WABA ID)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 104928172635412"
-                    value={manualWabaId}
-                    onChange={(e) => setManualWabaId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-[#94a3b8] mb-1">
-                    Phone Number ID
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 109827364519283"
-                    value={manualPhoneId}
-                    onChange={(e) => setManualPhoneId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white text-sm font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-[#94a3b8] mb-1">
-                    Display Phone Number
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="+254 712 345 678"
-                    value={manualDisplayPhone}
-                    onChange={(e) => setManualDisplayPhone(e.target.value)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-[#94a3b8] mb-1">
-                    System User Permanent Access Token
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="EAAG..."
-                    value={manualToken}
-                    onChange={(e) => setManualToken(e.target.value)}
-                    className="w-full px-3 py-2 rounded-full bg-canvas border border-white/[0.08] text-white text-sm font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={() => handleDirectTokenConnect(true)}
-                  disabled={loading}
-                  className="px-4 py-2.5 rounded-full border border-white/[0.08] hover:bg-white/[0.08] text-xs font-medium text-[#94a3b8]"
-                >
-                  Use Sandbox Demo Credentials
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDirectTokenConnect(false)}
-                  disabled={loading}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm text-white bg-electric hover:bg-electric-hover transition"
-                >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <ShieldCheck className="w-4 h-4" />
-                  )}
-                  Connect &amp; Provision 5 Templates
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

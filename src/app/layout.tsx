@@ -7,6 +7,9 @@ import "./globals.css";
 import { NavigationLogger } from "@/components/NavigationLogger";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://showup.eris.co.ke"
+  ),
   title: "ShowUp Engine | WhatsApp Webinar Attendance Engine for Kenya & Africa",
   description:
     "Turn 20% webinar attendance into 60% with automated 5-stage official WhatsApp Cloud API sequences.",

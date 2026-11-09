@@ -11,7 +11,7 @@ import { checkSupabaseMigrationStatus, readLocalDb, supabase, writeLocalDb } fro
 
 const QSTASH_URL = process.env.QSTASH_URL || "https://qstash.upstash.io";
 const QSTASH_TOKEN = process.env.QSTASH_TOKEN || "";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3005";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://showup.eris.co.ke";
 
 export interface ComputedStageSchedule {
   stage: SequenceStage;

@@ -107,7 +107,7 @@ export const DEFAULT_WEBINAR_TEMPLATES: DefaultTemplateBlueprint[] = [
     example_values: [
       "Wanjiku",
       "Nairobi Real Estate & Wealth Masterclass",
-      "https://showup.co.ke/j/wk92x8a",
+      "https://showup.eris.co.ke/j/wk92x8a",
     ],
   },
 ];
