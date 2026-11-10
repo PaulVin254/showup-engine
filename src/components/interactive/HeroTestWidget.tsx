@@ -22,6 +22,25 @@ interface HeroTestWidgetProps {
   onSuccessToast?: (msg: string) => void;
 }
 
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement | string,
+        params: {
+          sitekey: string;
+          theme?: "light" | "dark" | "auto";
+          size?: "normal" | "compact" | "flexible";
+          callback?: (token: string) => void;
+          "expired-callback"?: () => void;
+          "error-callback"?: () => void;
+        }
+      ) => string;
+      reset: (widgetId?: string) => void;
+    };
+  }
+}
+
 const PRESET_TOPICS = [
   "Real Estate Masterclass",
   "Crypto & Forex Academy",
@@ -40,8 +59,44 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
   const [speechText, setSpeechText] = useState(
     "Jaribu hapa! Send a live WhatsApp test to your phone 👇"
   );
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const sendBtnRef = useRef<HTMLButtonElement | null>(null);
+  const turnstileRef = useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const siteKey =
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAAF7xXgTvKjxF-Unn";
+
+    let widgetId: string | null = null;
+    const interval = setInterval(() => {
+      if (
+        typeof window !== "undefined" &&
+        window.turnstile &&
+        turnstileRef.current &&
+        !widgetId
+      ) {
+        try {
+          widgetId = window.turnstile.render(turnstileRef.current, {
+            sitekey: siteKey,
+            theme: "dark",
+            size: "compact",
+            callback: (token: string) => {
+              setTurnstileToken(token);
+            },
+            "expired-callback": () => {
+              setTurnstileToken(null);
+            },
+          });
+          clearInterval(interval);
+        } catch {
+          // Retry on next tick if DOM/script isn't ready
+        }
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const cleanTitle = title.trim() || "Free Real Estate Masterclass";
 
@@ -86,6 +141,7 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
           recipientName: "Brian",
           eventTitle: cleanTitle,
           templateName: "event_registration_confirmed",
+          turnstileToken: turnstileToken,
         }),
       });
 
@@ -264,6 +320,9 @@ export function HeroTestWidget({ onSuccessToast }: HeroTestWidgetProps) {
               </button>
             </div>
           </div>
+
+          {/* Cloudflare Turnstile Bot Verification Mount */}
+          <div ref={turnstileRef} className="my-1 empty:hidden flex justify-center sm:justify-start" />
 
           {/* Sub-form Status Bar */}
           <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 px-1 pt-0.5">
