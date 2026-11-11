@@ -2,858 +2,674 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Upload } from "lucide-react";
+import { SenderMode, ShowUpEvent, ShowUpRegistrant, ShowUpTenant } from "@/lib/types";
+import { normalizeKenyanPhone, formatPhoneDisplay } from "@/lib/phone";
+import { PIPELINE_STAGES, stageTimingLabel } from "@/lib/pipeline";
+import { csvToLeadRows } from "@/lib/csv";
+import { cn } from "@/lib/cn";
 import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  CreditCard,
-  ExternalLink,
-  Loader2,
-  Plus,
-  ShieldCheck,
-  Smartphone,
-  Upload,
-} from "lucide-react";
-import {
-  SenderMode,
-  ShowUpEvent,
-  ShowUpRegistrant,
-  ShowUpTenant,
-} from "@/lib/types";
-import {
-  DEFAULT_WEBINAR_TEMPLATES,
-  formatEatDate,
-  renderTemplatePreview,
-} from "@/lib/default-templates";
+  Button,
+  Dialog,
+  EASE_OUT_FAST,
+  SPRING_SNAPPY,
+  StatusPill,
+  inputCls,
+  labelCls,
+} from "@/components/ui/kit";
 
 interface EventSetupWizardProps {
+  open: boolean;
   tenant: ShowUpTenant;
   initialEvent?: ShowUpEvent | null;
   initialTitle?: string;
   initialPhone?: string;
+  initialStep?: 1 | 2 | 3;
   eventRegistrants: ShowUpRegistrant[];
   originUrl: string;
-  onCancel?: () => void;
+  onClose: () => void;
   onEventSaved: (event: ShowUpEvent) => Promise<void>;
   onLaunched: (eventId: string, message: string) => Promise<void>;
   onOpenEmbeddedSignup: () => void;
   onToast: (msg: string) => void;
 }
 
-const MUSE_INPUT =
-  "w-full px-5 py-3.5 rounded-full bg-[#25272c] border border-white/[0.08] text-white text-sm placeholder:text-[#8a909e] focus:outline-none focus:border-[#4589ff] transition";
+const EAT_OFFSET_MS = 3 * 3600 * 1000;
+
+/** ISO (UTC) → "YYYY-MM-DDTHH:mm" in East Africa Time. */
+const isoToEatLocal = (iso: string) =>
+  new Date(new Date(iso).getTime() + EAT_OFFSET_MS).toISOString().slice(0, 16);
+/** "YYYY-MM-DDTHH:mm" in EAT → ISO (UTC). */
+const eatLocalToIso = (local: string) => new Date(`${local}:00+03:00`).toISOString();
+
+const STEPS = ["Details", "Leads", "Launch"] as const;
 
 export function EventSetupWizard({
+  open,
   tenant,
   initialEvent,
   initialTitle = "",
   initialPhone = "",
+  initialStep = 1,
   eventRegistrants,
   originUrl,
-  onCancel,
+  onClose,
   onEventSaved,
   onLaunched,
   onOpenEmbeddedSignup,
   onToast,
 }: EventSetupWizardProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [currentEvent, setCurrentEvent] = useState<ShowUpEvent | null>(
-    initialEvent || null
-  );
+  const [step, setStep] = useState<1 | 2 | 3>(initialEvent ? initialStep : 1);
+  const [dir, setDir] = useState<1 | -1>(1);
+  const [currentEvent, setCurrentEvent] = useState<ShowUpEvent | null>(initialEvent || null);
 
-  // Step 1 state: Your Webinar (30s)
-  const [title, setTitle] = useState(
-    initialEvent?.title ||
-      initialTitle ||
-      "Free Real Estate & Passive Income Masterclass"
-  );
+  const goStep = (next: 1 | 2 | 3) => {
+    setDir(next >= step ? 1 : -1);
+    setStep(next);
+  };
+
+  // Step 1
+  const [title, setTitle] = useState(initialEvent?.title || initialTitle || "");
   const [startsAtLocal, setStartsAtLocal] = useState(() => {
-    if (initialEvent?.starts_at) {
-      return new Date(initialEvent.starts_at).toISOString().slice(0, 16);
-    }
-    const d = new Date(Date.now() + 2 * 24 * 3600 * 1000);
-    d.setUTCHours(16, 0, 0, 0); // 7:00 PM EAT
+    if (initialEvent?.starts_at) return isoToEatLocal(initialEvent.starts_at);
+    const d = new Date(Date.now() + 2 * 24 * 3600 * 1000 + EAT_OFFSET_MS);
+    d.setUTCHours(19, 0, 0, 0);
     return d.toISOString().slice(0, 16);
   });
-  const [joinUrl, setJoinUrl] = useState(
-    initialEvent?.join_url || "https://meet.google.com/landing"
-  );
-  const [hostPhone, setHostPhone] = useState(
-    initialPhone || tenant.phone_e164 || ""
-  );
-  const [savingStep1, setSavingStep1] = useState(false);
+  const [joinUrl, setJoinUrl] = useState(initialEvent?.join_url || "");
+  const [hostPhone, setHostPhone] = useState(initialPhone || tenant.phone_e164 || "");
+  const [saving, setSaving] = useState(false);
 
-  // Step 2 state: Add Your People (60s)
+  // Step 2
   const [leadTab, setLeadTab] = useState<"page" | "paste" | "meta">("page");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [pasteText, setPasteText] = useState(
-    "Grace Muthoni, 0721 884 920\nSamuel Kariuki, 0710 553 190\nEsther Wambui, 0711 442 819"
-  );
-  const [importingLeads, setImportingLeads] = useState(false);
-  const [quickName, setQuickName] = useState("");
-  const [quickPhone, setQuickPhone] = useState("");
+  const [pasteText, setPasteText] = useState("");
+  const [importing, setImporting] = useState(false);
 
-  // Step 3 state: Go Live (60s)
-  const [previewIdx, setPreviewIdx] = useState(0);
+  // Step 3
   const [senderMode, setSenderMode] = useState<SenderMode>(
     initialEvent?.sender_mode || "shared_showup"
   );
-  const [passTier, setPassTier] = useState<"event_pass" | "event_scale">(
-    "event_pass"
-  );
-  const [mpesaPhone, setMpesaPhone] = useState(
-    initialPhone || tenant.phone_e164 || "0712345678"
-  );
+  const [passTier, setPassTier] = useState<"event_pass" | "event_scale">("event_pass");
+  const [mpesaPhone, setMpesaPhone] = useState(initialPhone || tenant.phone_e164 || "");
   const [paying, setPaying] = useState(false);
+
+  const hostNorm = normalizeKenyanPhone(hostPhone);
+  const mpesaNorm = normalizeKenyanPhone(mpesaPhone);
+  const leadCount = eventRegistrants.length;
+  const priceKes = passTier === "event_scale" ? 3000 : 1500;
 
   const copyText = (key: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
+    setTimeout(() => setCopiedKey(null), 1600);
   };
 
-  // Step 1 Handler
-  const handleStep1Submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingStep1(true);
-    try {
-      const res = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventId: currentEvent?.id,
-          title: title.trim(),
-          hostName: tenant.business_name.split(" ")[0] || "Founder",
-          hostPhone: hostPhone.trim(),
-          startsAt: new Date(startsAtLocal).toISOString(),
-          joinUrl: joinUrl.trim(),
-          senderMode,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save webinar");
-      setCurrentEvent(data.event);
-      if (hostPhone.trim()) {
-        setMpesaPhone(hostPhone.trim());
-      }
-      await onEventSaved(data.event);
-      setStep(2);
-    } catch (err: unknown) {
-      onToast(err instanceof Error ? err.message : "Failed saving webinar");
-    } finally {
-      setSavingStep1(false);
-    }
-  };
-
-  // Step 2: Paste or Import CSV Handler
-  const handleBulkPasteImport = async () => {
-    if (!currentEvent) return;
-    const lines = pasteText
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    if (lines.length === 0) return;
-
-    const rows = lines.map((line) => {
-      const parts = line.split(/[,;\t]+/).map((p) => p.trim());
-      if (parts.length >= 2) {
-        return { name: parts[0], phone: parts[1], email: parts[2] || "" };
-      }
-      return { name: "Webinar Lead", phone: parts[0] };
+  const postJson = async (url: string, body: unknown) => {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
-
-    setImportingLeads(true);
-    try {
-      const res = await fetch(`/api/events/${currentEvent.id}/import-csv`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, mode: "registrants" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Import failed");
-      onToast(data.message || `Added ${rows.length} people!`);
-      await onEventSaved(currentEvent);
-    } catch (err: unknown) {
-      onToast(err instanceof Error ? err.message : "Failed importing list");
-    } finally {
-      setImportingLeads(false);
-    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Request failed");
+    return data;
   };
 
-  const handleQuickSingleAdd = async (e: React.FormEvent) => {
+  const saveStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentEvent || !quickName || !quickPhone) return;
-    setImportingLeads(true);
+    if (!hostNorm) {
+      onToast("Enter a valid Kenyan WhatsApp number");
+      return;
+    }
+    setSaving(true);
     try {
-      const res = await fetch(`/api/events/${currentEvent.id}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: quickName,
-          phone: quickPhone,
-          source: "manual_test",
-        }),
+      const data = await postJson("/api/events", {
+        eventId: currentEvent?.id,
+        title: title.trim(),
+        hostName: tenant.business_name.split(" ")[0] || "Host",
+        hostPhone: hostPhone.trim(),
+        startsAt: eatLocalToIso(startsAtLocal),
+        joinUrl: joinUrl.trim(),
+        senderMode,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setQuickName("");
-      setQuickPhone("");
-      onToast(`Added ${data.registrant.full_name}!`);
-      await onEventSaved(currentEvent);
-    } catch (err: unknown) {
-      onToast(err instanceof Error ? err.message : "Could not add person");
+      setCurrentEvent(data.event);
+      if (!mpesaPhone) setMpesaPhone(hostPhone.trim());
+      await onEventSaved(data.event);
+      goStep(2);
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Could not save webinar");
     } finally {
-      setImportingLeads(false);
+      setSaving(false);
     }
   };
 
-  // Step 3: M-Pesa STK Push & Launch Handler
-  const handlePayAndLaunch = async (e: React.FormEvent) => {
+  const importRows = async (rows: Array<{ name: string; phone: string; email?: string }>) => {
+    if (!currentEvent || rows.length === 0) return;
+    setImporting(true);
+    try {
+      const data = await postJson(`/api/events/${currentEvent.id}/import-csv`, {
+        rows,
+        mode: "registrants",
+      });
+      onToast(data.message || `Added ${rows.length} people`);
+      setPasteText("");
+      await onEventSaved(currentEvent);
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const importPasted = () =>
+    importRows(
+      pasteText
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const p = line.split(/[,;\t]+/).map((x) => x.trim());
+          return p.length >= 2
+            ? { name: p[0], phone: p[1], email: p[2] }
+            : { name: "Lead", phone: p[0] };
+        })
+    );
+
+  const payAndLaunch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentEvent) return;
+    if (!mpesaNorm) {
+      onToast("Enter a valid M-Pesa number");
+      return;
+    }
     setPaying(true);
     try {
-      const res = await fetch("/api/billing/stk-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planTier: passTier,
-          phone: mpesaPhone,
-          eventId: currentEvent.id,
-          senderMode,
-        }),
+      const data = await postJson("/api/billing/stk-push", {
+        planTier: passTier,
+        phone: mpesaPhone,
+        eventId: currentEvent.id,
+        senderMode,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "M-Pesa payment failed");
-      await onLaunched(currentEvent.id, data.message);
-    } catch (err: unknown) {
+      await onLaunched(currentEvent.id, data.message || "STK push sent. Check your phone.");
+    } catch (err) {
       onToast(err instanceof Error ? err.message : "Payment failed");
     } finally {
       setPaying(false);
     }
   };
 
-  const activeTpl = DEFAULT_WEBINAR_TEMPLATES[previewIdx];
-  const eatFormatted = currentEvent
-    ? formatEatDate(currentEvent.starts_at)
-    : formatEatDate(new Date(startsAtLocal).toISOString());
+  const pastedCount = pasteText.split(/\r?\n/).filter((l) => l.trim()).length;
+  const previewEvent: ShowUpEvent | null = currentEvent;
 
-  const previewValues = [
-    "Wanjiku",
-    currentEvent?.title || title || "Masterclass",
-    eatFormatted.dateStr,
-    eatFormatted.timeStr,
-    eatFormatted.timeStr,
-  ];
-
-  const leadCount = eventRegistrants.length;
-  const estimatedAdSpendKes = Math.max(leadCount * 170, 4500);
-  const priceKes = passTier === "event_scale" ? 3000 : 1500;
+  const footer =
+    step === 1 ? (
+      <>
+        <span className="text-[11.5px] text-slate-500">Times are East Africa Time (UTC+3)</span>
+        <Button type="submit" form="wiz-step1" variant="brand" loading={saving}>
+          Continue
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Button>
+      </>
+    ) : step === 2 ? (
+      <>
+        <Button
+          variant="ghost"
+          onClick={() => goStep(1)}
+          icon={<ArrowLeft className="w-3.5 h-3.5" />}
+        >
+          Back
+        </Button>
+        <Button variant="brand" onClick={() => goStep(3)}>
+          Continue
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Button>
+      </>
+    ) : (
+      <>
+        <Button
+          variant="ghost"
+          onClick={() => goStep(2)}
+          icon={<ArrowLeft className="w-3.5 h-3.5" />}
+        >
+          Back
+        </Button>
+        <Button type="submit" form="wiz-step3" variant="success" loading={paying}>
+          Pay KES {priceKes.toLocaleString("en-KE")} via M-Pesa
+        </Button>
+      </>
+    );
 
   return (
-    <div className="max-w-2xl mx-auto w-full">
-      <div className="bg-[#17191e] border border-white/[0.08] rounded-3xl p-6 sm:p-9 shadow-2xl space-y-7">
-        {/* Top Progress Header */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              {onCancel && (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={initialEvent ? "Edit webinar" : "New webinar"}
+      width="max-w-xl"
+      footer={footer}
+    >
+      {/* Stepper */}
+      <ol className="flex items-center gap-2 mb-5 text-[12px]">
+        {STEPS.map((label, i) => {
+          const n = (i + 1) as 1 | 2 | 3;
+          const done = step > n;
+          const enabled = n === 1 || Boolean(currentEvent);
+          return (
+            <React.Fragment key={label}>
+              {i > 0 && <span aria-hidden className="h-px w-6 bg-white/[0.1]" />}
+              <li>
                 <button
                   type="button"
-                  onClick={onCancel}
-                  className="text-xs text-[#8a909e] hover:text-white px-3 py-1.5 rounded-full bg-[#25272c] transition"
+                  disabled={!enabled}
+                  onClick={() => goStep(n)}
+                  aria-current={step === n ? "step" : undefined}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 transition disabled:opacity-40",
+                    step === n ? "text-white" : done ? "text-slate-300" : "text-slate-500"
+                  )}
                 >
-                  ← Back
-                </button>
-              )}
-              <span className="text-sm font-medium text-white">
-                {step === 1 && "Step 1: Your webinar"}
-                {step === 2 && "Step 2: Add your people"}
-                {step === 3 && "Step 3: Go live"}
-              </span>
-            </div>
-            <span className="text-xs font-mono text-[#8a909e]">
-              Step {step} of 3
-            </span>
-          </div>
-
-          {/* 3-Node Linear Progress Bar */}
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { s: 1, label: "1. Your webinar" },
-              { s: 2, label: "2. Add your people" },
-              { s: 3, label: "3. Go live" },
-            ].map((item) => {
-              const active = step >= item.s;
-              return (
-                <button
-                  key={item.s}
-                  type="button"
-                  disabled={item.s > 1 && !currentEvent}
-                  onClick={() => {
-                    if (item.s === 1 || currentEvent) {
-                      setStep(item.s as 1 | 2 | 3);
-                    }
-                  }}
-                  className="text-left group disabled:opacity-40"
-                >
-                  <div
-                    className={`h-1.5 rounded-full transition-all ${
-                      active ? "bg-[#4589ff]" : "bg-[#25272c]"
-                    }`}
-                  />
-                  <div
-                    className={`text-[11px] mt-1.5 font-medium ${
-                      step === item.s ? "text-white" : "text-[#8a909e]"
-                    }`}
+                  <span
+                    className={cn(
+                      "w-4 h-4 rounded-full flex items-center justify-center font-mono text-[10px] border",
+                      step === n && "border-[#1877f2] bg-[#1877f2]/15 text-[#5aa2ff]",
+                      done && "border-[#00a884]/40 bg-[#00a884]/15 text-[#00a884]",
+                      step < n && "border-white/[0.12]"
+                    )}
                   >
-                    {item.label}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* STEP 1: YOUR WEBINAR (30s) */}
-        {step === 1 && (
-          <form onSubmit={handleStep1Submit} className="space-y-5">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-white">
-                Tell us about your live room.
-              </h2>
-              <p className="text-xs sm:text-sm text-[#8a909e] mt-1">
-                Just 3 details. We pre-fill your 5 East Africa Time WhatsApp
-                reminders automatically.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-[#9ca3af] mb-2 ml-3">
-                  What&apos;s your webinar called?
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Free Real Estate Masterclass"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className={MUSE_INPUT}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-[#9ca3af] mb-2 ml-3">
-                  When does it start?{" "}
-                  <span className="text-[#4589ff] font-mono">
-                    (East Africa Time · EAT)
+                    {done ? <Check className="w-2.5 h-2.5" /> : n}
                   </span>
-                </label>
+                  {label}
+                </button>
+              </li>
+            </React.Fragment>
+          );
+        })}
+      </ol>
+
+      <AnimatePresence mode="wait" initial={false} custom={dir}>
+        {/* ---------------- Step 1 ---------------- */}
+        {step === 1 && (
+          <motion.form
+            key="wiz-step-1"
+            id="wiz-step1"
+            onSubmit={saveStep1}
+            initial={{ opacity: 0, x: dir * 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: dir * -18 }}
+            transition={EASE_OUT_FAST}
+            className="space-y-4"
+          >
+            <div>
+              <label className={labelCls}>Webinar title</label>
+              <input
+                required
+                autoFocus
+                placeholder="Free Real Estate Masterclass"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Starts (EAT)</label>
                 <input
-                  type="datetime-local"
                   required
+                  type="datetime-local"
                   value={startsAtLocal}
                   onChange={(e) => setStartsAtLocal(e.target.value)}
-                  className={`${MUSE_INPUT} font-mono`}
+                  className={cn(inputCls, "font-mono tabular-nums")}
                 />
               </div>
-
               <div>
-                <label className="block text-xs text-[#9ca3af] mb-2 ml-3">
-                  Where do people join live? (Zoom, Google Meet, or YouTube link)
-                </label>
+                <label className={labelCls}>Your WhatsApp number</label>
                 <input
-                  type="url"
                   required
-                  placeholder="https://zoom.us/j/... or https://meet.google.com/..."
-                  value={joinUrl}
-                  onChange={(e) => setJoinUrl(e.target.value)}
-                  className={`${MUSE_INPUT} font-mono`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-[#9ca3af] mb-2 ml-3">
-                  Your WhatsApp number{" "}
-                  <span className="text-[#8a909e]">
-                    (saves your private room &amp; M-Pesa receipt)
-                  </span>
-                </label>
-                <input
                   type="tel"
-                  required
                   placeholder="0712 345 678"
                   value={hostPhone}
                   onChange={(e) => setHostPhone(e.target.value)}
-                  className={`${MUSE_INPUT} font-mono`}
+                  className={cn(
+                    inputCls,
+                    "font-mono tabular-nums",
+                    hostPhone.length > 3 && !hostNorm && "border-red-500/60"
+                  )}
                 />
+                <div className="mt-1 h-3.5 text-[10.5px] font-mono tabular-nums text-slate-500">
+                  {hostNorm ? `→ +${hostNorm}` : ""}
+                </div>
               </div>
             </div>
-
-            <div className="pt-2 flex items-center justify-end">
-              <button
-                type="submit"
-                disabled={savingStep1}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-white font-medium text-sm px-8 py-3.5 transition active:scale-[0.99]"
-              >
-                {savingStep1 ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    Continue
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
+            <div>
+              <label className={labelCls}>Join link (Zoom, Meet or YouTube)</label>
+              <input
+                required
+                type="url"
+                placeholder="https://zoom.us/j/…"
+                value={joinUrl}
+                onChange={(e) => setJoinUrl(e.target.value)}
+                className={cn(inputCls, "font-mono")}
+              />
             </div>
-          </form>
+          </motion.form>
         )}
 
-        {/* STEP 2: ADD YOUR PEOPLE (60s) */}
+        {/* ---------------- Step 2 ---------------- */}
         {step === 2 && currentEvent && (
-          <div className="space-y-6">
+          <motion.div
+            key="wiz-step-2"
+            initial={{ opacity: 0, x: dir * 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: dir * -18 }}
+            transition={EASE_OUT_FAST}
+            className="space-y-4"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-white">
-                  Add your people.
-                </h2>
-                <p className="text-xs sm:text-sm text-[#8a909e] mt-1">
-                  Share your ready-made registration link or paste leads you
-                  already collected.
-                </p>
+              <div className="inline-flex flex-wrap p-0.5 rounded-md bg-white/[0.04] border border-white/[0.08] text-[12px]">
+                {(
+                  [
+                    ["page", "Reg page"],
+                    ["paste", "Paste / CSV"],
+                    ["meta", "Meta Ads"],
+                  ] as const
+                ).map(([id, label]) => {
+                  const active = leadTab === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setLeadTab(id)}
+                      className={cn(
+                        "relative h-7 px-2.5 rounded transition-colors",
+                        active ? "text-white" : "text-slate-500 hover:text-slate-200"
+                      )}
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="wizard-lead-tab"
+                          transition={SPRING_SNAPPY}
+                          className="absolute inset-0 rounded bg-white/[0.1]"
+                        />
+                      )}
+                      <span className="relative z-10">{label}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <span className="px-3.5 py-1.5 rounded-full bg-[#25272c] border border-white/[0.08] text-xs font-mono text-white">
-                {leadCount} {leadCount === 1 ? "person" : "people"} ready
-              </span>
+              <StatusPill tone={leadCount > 0 ? "emerald" : "slate"}>
+                <span className="font-mono tabular-nums">{leadCount}</span> ready
+              </StatusPill>
             </div>
 
-            {/* 3 Segmented Tabs */}
-            <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-full bg-[#101114] border border-white/[0.06]">
-              {[
-                { id: "page", label: "Registration page" },
-                { id: "paste", label: "Paste / Upload list" },
-                { id: "meta", label: "Facebook Ads (Adv)" },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setLeadTab(t.id as typeof leadTab)}
-                  className={`py-2 px-3 rounded-full text-xs font-medium transition ${
-                    leadTab === t.id
-                      ? "bg-[#25272c] text-white shadow"
-                      : "text-[#8a909e] hover:text-white"
-                  }`}
+            <AnimatePresence mode="wait" initial={false}>
+              {leadTab === "page" && (
+                <motion.div
+                  key="tab-page"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.14 }}
+                  className="space-y-3"
                 >
-                  {t.label}
+                  <div className="flex items-center gap-2 h-9 pl-3 pr-1 rounded-md border border-white/[0.08] bg-white/[0.02]">
+                    <code className="flex-1 truncate font-mono text-[12px] text-slate-300">
+                      {originUrl}/r/{currentEvent.slug}
+                    </code>
+                    <Button
+                      size="sm"
+                      onClick={() => copyText("reg", `${originUrl}/r/${currentEvent.slug}`)}
+                      icon={
+                        copiedKey === "reg" ? (
+                          <Check className="w-3 h-3 text-[#00a884]" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )
+                      }
+                    >
+                      {copiedKey === "reg" ? "Copied" : "Copy"}
+                    </Button>
+                    <Link
+                      href={`/r/${currentEvent.slug}`}
+                      target="_blank"
+                      className="h-7 px-2 inline-flex items-center rounded-md text-slate-400 hover:text-white hover:bg-white/[0.06]"
+                      aria-label="Preview registration page"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                  <p className="text-[12px] text-slate-500">
+                    Use it in ads, your bio or WhatsApp status. Every signup joins the sequence
+                    automatically.
+                  </p>
+                </motion.div>
+              )}
+
+              {leadTab === "paste" && (
+                <motion.div
+                  key="tab-paste"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.14 }}
+                  className="space-y-3"
+                >
+                  <textarea
+                    rows={5}
+                    value={pasteText}
+                    onChange={(e) => setPasteText(e.target.value)}
+                    placeholder={"Wanjiku Kamau, 0712 345 678\nBrian Otieno, +254 722 000 111"}
+                    className={cn(inputCls, "h-auto py-2 font-mono text-[12px] leading-relaxed")}
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="inline-flex items-center gap-1.5 text-[12px] text-slate-400 hover:text-white cursor-pointer transition">
+                      <Upload className="w-3.5 h-3.5" />
+                      Upload CSV
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (f) await importRows(csvToLeadRows(await f.text()));
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <Button
+                      variant="brand"
+                      size="sm"
+                      loading={importing}
+                      disabled={pastedCount === 0}
+                      onClick={importPasted}
+                    >
+                      Add {pastedCount || ""} {pastedCount === 1 ? "person" : "people"}
+                    </Button>
+                  </div>
+                  <p className="text-[11.5px] text-slate-600">
+                    07XX, 01XX and +254 formats are normalised to +254.
+                  </p>
+                </motion.div>
+              )}
+
+              {leadTab === "meta" && (
+                <motion.div
+                  key="tab-meta"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.14 }}
+                  className="space-y-3"
+                >
+                  <p className="text-[12px] text-slate-400">
+                    POST <code className="font-mono text-slate-200">{"{ fullName, phone }"}</code>{" "}
+                    from Meta Lead Ads, Zapier or Make.
+                  </p>
+                  <div className="flex items-center gap-2 h-9 pl-3 pr-1 rounded-md border border-white/[0.08] bg-white/[0.02]">
+                    <code className="flex-1 truncate font-mono text-[12px] text-slate-300">
+                      {originUrl}/api/events/{currentEvent.id}/register
+                    </code>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        copyText("hook", `${originUrl}/api/events/${currentEvent.id}/register`)
+                      }
+                      icon={
+                        copiedKey === "hook" ? (
+                          <Check className="w-3 h-3 text-[#00a884]" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )
+                      }
+                    >
+                      {copiedKey === "hook" ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+
+        {/* ---------------- Step 3 ---------------- */}
+        {step === 3 && currentEvent && (
+          <motion.form
+            key="wiz-step-3"
+            id="wiz-step3"
+            onSubmit={payAndLaunch}
+            initial={{ opacity: 0, x: dir * 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: dir * -18 }}
+            transition={EASE_OUT_FAST}
+            className="space-y-5"
+          >
+            <div>
+              <div className={labelCls}>Sequence</div>
+              <ul className="rounded-md border border-white/[0.08] divide-y divide-white/[0.06]">
+                {PIPELINE_STAGES.map((s) => (
+                  <li key={s.key} className="flex items-center gap-3 px-3 h-9 text-[12.5px]">
+                    <span className="font-mono tabular-nums text-[11px] text-slate-600 w-3">
+                      {s.step}
+                    </span>
+                    <span className="text-white">{s.label}</span>
+                    <span className="ml-auto font-mono tabular-nums text-[11.5px] text-slate-500">
+                      {previewEvent ? stageTimingLabel(s, previewEvent) : s.rule}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div role="radiogroup" aria-label="Sender" className="grid sm:grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    mode: "shared_showup" as const,
+                    title: "ShowUp number",
+                    sub: "Verified, no setup. Sends immediately.",
+                    badge: "Instant",
+                  },
+                  {
+                    mode: "own_waba" as const,
+                    title: "My business number",
+                    sub:
+                      tenant.waba_status === "connected"
+                        ? `Sending from ${tenant.display_phone_number}`
+                        : "Connect via Meta. Falls back to ShowUp while templates are reviewed.",
+                    badge: tenant.waba_status === "connected" ? "Connected" : "Connect",
+                  },
+                ]
+              ).map((o) => (
+                <button
+                  key={o.mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={senderMode === o.mode}
+                  onClick={() => {
+                    setSenderMode(o.mode);
+                    if (o.mode === "own_waba" && tenant.waba_status !== "connected")
+                      onOpenEmbeddedSignup();
+                  }}
+                  className={cn(
+                    "text-left rounded-md border px-3 py-2.5 transition",
+                    senderMode === o.mode
+                      ? "border-[#1877f2] bg-[#1877f2]/[0.06]"
+                      : "border-white/[0.08] hover:border-white/[0.16]"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-medium text-white">{o.title}</span>
+                    <StatusPill
+                      tone={
+                        o.mode === "shared_showup"
+                          ? "emerald"
+                          : tenant.waba_status === "connected"
+                          ? "emerald"
+                          : "slate"
+                      }
+                      dot={false}
+                    >
+                      {o.badge}
+                    </StatusPill>
+                  </div>
+                  <p className="mt-1 text-[11.5px] text-slate-500 leading-snug">{o.sub}</p>
                 </button>
               ))}
             </div>
 
-            {/* Tab 1: Hosted Registration Page (Default) */}
-            {leadTab === "page" && (
-              <div className="p-5 sm:p-6 rounded-3xl bg-[#25272c]/60 border border-white/[0.08] space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-emerald-400">
-                    ✓ Your hosted registration page is live
-                  </span>
-                  <span className="text-[11px] text-[#8a909e]">
-                    Recommended default
-                  </span>
+            <div className="rounded-md border border-white/[0.08] p-3.5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[12.5px] text-slate-300">
+                  <span className="font-mono tabular-nums text-white">{leadCount}</span> leads
+                  queued.{" "}
+                  <span className="text-slate-500">Welcome messages send on payment.</span>
                 </div>
-
-                <div className="p-3.5 rounded-2xl bg-[#101114] border border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <code className="text-xs sm:text-sm text-[#4589ff] font-mono truncate">
-                    {originUrl}/r/{currentEvent.slug}
-                  </code>
-                  <div className="flex items-center gap-2 shrink-0">
+                <div className="inline-flex p-0.5 rounded-md bg-white/[0.04] border border-white/[0.08] text-[11.5px] shrink-0">
+                  {(
+                    [
+                      ["event_pass", "200 · 1,500"],
+                      ["event_scale", "500 · 3,000"],
+                    ] as const
+                  ).map(([id, label]) => (
                     <button
+                      key={id}
                       type="button"
-                      onClick={() =>
-                        copyText("regLink", `${originUrl}/r/${currentEvent.slug}`)
-                      }
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-xs font-medium text-white transition"
-                    >
-                      {copiedKey === "regLink" ? (
-                        <>
-                          <Check className="w-3.5 h-3.5" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          Copy link
-                        </>
+                      onClick={() => setPassTier(id)}
+                      className={cn(
+                        "h-6 px-2 rounded font-mono tabular-nums transition",
+                        passTier === id ? "bg-white/[0.1] text-white" : "text-slate-500"
                       )}
-                    </button>
-                    <Link
-                      href={`/r/${currentEvent.slug}`}
-                      target="_blank"
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#25272c] hover:bg-[#2f3238] text-xs text-white transition"
                     >
-                      Preview
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-
-                <p className="text-xs text-[#9ca3af] leading-relaxed">
-                  Drop this link into your Facebook/Instagram ad, bio, or
-                  WhatsApp status. Every person who signs up gets added to your
-                  webinar automatically.
-                </p>
-              </div>
-            )}
-
-            {/* Tab 2: Paste or Upload List */}
-            {leadTab === "paste" && (
-              <div className="p-5 rounded-3xl bg-[#25272c]/60 border border-white/[0.08] space-y-4">
-                <div>
-                  <label className="block text-xs text-white font-medium mb-1.5">
-                    Paste names &amp; Kenyan phone numbers (one per line)
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={pasteText}
-                    onChange={(e) => setPasteText(e.target.value)}
-                    placeholder="Wanjiku Kamau, 0712 345 678"
-                    className="w-full p-4 rounded-2xl bg-[#101114] border border-white/[0.08] text-xs text-white font-mono focus:outline-none focus:border-[#4589ff]"
-                  />
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[11px] text-[#8a909e]">
-                    Accepts 07XX, 01XX, or +254 formats
-                  </span>
-                  <button
-                    type="button"
-                    disabled={importingLeads}
-                    onClick={handleBulkPasteImport}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-xs font-medium text-white transition"
-                  >
-                    {importingLeads ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="w-3.5 h-3.5" />
-                    )}
-                    Add pasted people
-                  </button>
-                </div>
-
-                {/* Quick single person add */}
-                <form
-                  onSubmit={handleQuickSingleAdd}
-                  className="pt-3 border-t border-white/[0.08] grid grid-cols-1 sm:grid-cols-12 gap-2"
-                >
-                  <input
-                    type="text"
-                    placeholder="Single Name (e.g. Jane)"
-                    value={quickName}
-                    onChange={(e) => setQuickName(e.target.value)}
-                    className="sm:col-span-5 px-4 py-2 rounded-full bg-[#101114] border border-white/[0.08] text-xs text-white"
-                  />
-                  <input
-                    type="tel"
-                    placeholder="0712 345 678"
-                    value={quickPhone}
-                    onChange={(e) => setQuickPhone(e.target.value)}
-                    className="sm:col-span-4 px-4 py-2 rounded-full bg-[#101114] border border-white/[0.08] text-xs text-white font-mono"
-                  />
-                  <button
-                    type="submit"
-                    disabled={importingLeads}
-                    className="sm:col-span-3 inline-flex items-center justify-center gap-1 px-4 py-2 rounded-full bg-[#25272c] hover:bg-[#2f3238] text-xs font-medium text-white"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add 1
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {/* Tab 3: Facebook Lead Ads Webhook (Advanced) */}
-            {leadTab === "meta" && (
-              <div className="p-5 rounded-3xl bg-[#25272c]/60 border border-white/[0.08] space-y-3">
-                <div className="text-xs font-medium text-white">
-                  Instant Webhook for Meta Lead Ads / Zapier / Make
-                </div>
-                <p className="text-xs text-[#9ca3af]">
-                  Send a <code className="text-white">POST</code> request with{" "}
-                  <code className="text-white">
-                    &#123; fullName, phone &#125;
-                  </code>{" "}
-                  to trigger the 5-stage sequence automatically:
-                </p>
-                <div className="p-3.5 rounded-2xl bg-[#101114] border border-white/[0.08] flex items-center justify-between gap-2">
-                  <code className="text-xs text-[#4589ff] font-mono truncate">
-                    {originUrl}/api/events/{currentEvent.id}/register
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      copyText(
-                        "whLink",
-                        `${originUrl}/api/events/${currentEvent.id}/register`
-                      )
-                    }
-                    className="px-3.5 py-1.5 rounded-full bg-[#25272c] text-xs text-white shrink-0"
-                  >
-                    {copiedKey === "whLink" ? "Copied" : "Copy URL"}
-                  </button>
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
-            )}
-
-            <div className="pt-2 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="inline-flex items-center gap-1.5 text-xs text-[#8a909e] hover:text-white px-4 py-2.5 rounded-full bg-[#25272c]"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(3)}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-white font-medium text-sm px-8 py-3.5 transition"
-              >
-                Continue to launch
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: GO LIVE (60s — Preview + Shared Sender + M-Pesa Paywall) */}
-        {step === 3 && currentEvent && (
-          <form onSubmit={handlePayAndLaunch} className="space-y-6">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-white">
-                Preview &amp; go live.
-              </h2>
-              <p className="text-xs sm:text-sm text-[#8a909e] mt-1">
-                Review the 5 reminders your attendees will receive, pick your
-                sender, and activate with M-Pesa.
+              <div>
+                <label className={labelCls}>M-Pesa number (STK push)</label>
+                <input
+                  required
+                  type="tel"
+                  placeholder="0712 345 678"
+                  value={mpesaPhone}
+                  onChange={(e) => setMpesaPhone(e.target.value)}
+                  className={cn(
+                    inputCls,
+                    "font-mono tabular-nums",
+                    mpesaPhone.length > 3 && !mpesaNorm && "border-red-500/60"
+                  )}
+                />
+                <div className="mt-1 h-3.5 text-[10.5px] font-mono tabular-nums text-slate-500">
+                  {mpesaNorm ? `Prompt goes to ${formatPhoneDisplay(mpesaNorm)}` : ""}
+                </div>
+              </div>
+              <p className="text-[11.5px] text-slate-500">
+                Full refund if fewer than 30% of registrants show up.
               </p>
             </div>
-
-            {/* 5-Message Handset Carousel */}
-            <div className="p-5 rounded-3xl bg-[#0b141a] border border-emerald-500/30 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-mono uppercase text-emerald-400">
-                    {activeTpl.stageLabel}
-                  </span>
-                  <div className="text-xs text-[#8a909e]">
-                    Timing: {activeTpl.timingLabel}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPreviewIdx((i) =>
-                        i === 0 ? DEFAULT_WEBINAR_TEMPLATES.length - 1 : i - 1
-                      )
-                    }
-                    className="p-1.5 rounded-full bg-[#17191e] text-white hover:bg-[#25272c]"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="text-xs font-mono text-white px-2">
-                    {previewIdx + 1} of {DEFAULT_WEBINAR_TEMPLATES.length}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPreviewIdx(
-                        (i) => (i + 1) % DEFAULT_WEBINAR_TEMPLATES.length
-                      )
-                    }
-                    className="p-1.5 rounded-full bg-[#17191e] text-white hover:bg-[#25272c]"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#17212b] text-xs sm:text-sm text-[#e2e8f0] whitespace-pre-wrap leading-relaxed">
-                {renderTemplatePreview(activeTpl.body_text, previewValues)}
-              </div>
-            </div>
-
-            {/* Sender Selection: Instant Shared Number vs Own WABA Later */}
-            <div className="space-y-2.5">
-              <div className="text-xs text-[#9ca3af] font-medium ml-1">
-                Sent from:
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSenderMode("shared_showup")}
-                  className={`p-4 rounded-2xl border text-left transition ${
-                    senderMode === "shared_showup"
-                      ? "bg-[#25272c] border-[#4589ff]"
-                      : "bg-[#101114] border-white/[0.08] opacity-75"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-white flex items-center gap-1.5">
-                      <Smartphone className="w-3.5 h-3.5 text-[#4589ff]" />
-                      ShowUp Verified Number
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-medium">
-                      Instant
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#8a909e] mt-1.5">
-                    Zero Meta setup. Messages say &ldquo;Hi Wanjiku, this is the{" "}
-                    {currentEvent.title.slice(0, 22)}... team via ShowUp&rdquo;.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSenderMode("own_waba");
-                    if (tenant.waba_status !== "connected") {
-                      onOpenEmbeddedSignup();
-                    }
-                  }}
-                  className={`p-4 rounded-2xl border text-left transition ${
-                    senderMode === "own_waba"
-                      ? "bg-[#25272c] border-[#4589ff]"
-                      : "bg-[#101114] border-white/[0.08] opacity-75"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-white">
-                      My own business number
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-[#9ca3af]">
-                      {tenant.waba_status === "connected"
-                        ? "Connected"
-                        : "Free Power-Up"}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#8a909e] mt-1.5">
-                    {tenant.waba_status === "connected"
-                      ? `Sending from ${tenant.display_phone_number} (with Smart Auto-Fallback to our number while templates review).`
-                      : "Connect via 1-Click Meta Embedded Signup. Auto-falls back to our verified number while Meta approves your templates."}
-                  </p>
-                </button>
-              </div>
-            </div>
-
-            {/* Psychological No-Brainer M-Pesa Launch Box */}
-            <div className="p-5 sm:p-6 rounded-3xl bg-[#25272c] border border-[#4589ff]/40 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="text-sm font-medium text-white">
-                    {leadCount > 0
-                      ? `${leadCount} leads are ready. Their welcome message sends the moment you pay.`
-                      : "Your registration link & 5 reminders go live the moment you pay."}
-                  </div>
-                  <div className="text-xs text-[#9ca3af] mt-0.5">
-                    {leadCount > 0 ? (
-                      <>
-                        You spent ~
-                        <strong className="text-white font-mono">
-                          KES {estimatedAdSpendKes.toLocaleString()}
-                        </strong>{" "}
-                        in ad spend/effort to get these leads. Protect that
-                        investment for{" "}
-                        <strong className="text-white font-mono">
-                          KES {priceKes.toLocaleString()}
-                        </strong>
-                        .
-                      </>
-                    ) : (
-                      "Includes up to 200 leads · 5 automated WhatsApp stages in EAT."
-                    )}
-                  </div>
-                </div>
-
-                {/* Tier Toggle (200 vs 500 leads) */}
-                <div className="inline-flex rounded-full bg-[#17191e] p-1 border border-white/[0.06] text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setPassTier("event_pass")}
-                    className={`px-3 py-1 rounded-full transition ${
-                      passTier === "event_pass"
-                        ? "bg-[#4589ff] text-white font-medium"
-                        : "text-[#8a909e]"
-                    }`}
-                  >
-                    200 leads · KES 1,500
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPassTier("event_scale")}
-                    className={`px-3 py-1 rounded-full transition ${
-                      passTier === "event_scale"
-                        ? "bg-[#4589ff] text-white font-medium"
-                        : "text-[#8a909e]"
-                    }`}
-                  >
-                    500 leads · KES 3,000
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-1">
-                <div className="sm:col-span-5">
-                  <label className="block text-[11px] text-[#9ca3af] mb-1 ml-3">
-                    M-Pesa phone number
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={mpesaPhone}
-                    onChange={(e) => setMpesaPhone(e.target.value)}
-                    placeholder="0712 345 678"
-                    className="w-full px-4 py-3 rounded-full bg-[#17191e] border border-white/[0.08] text-white font-mono text-sm focus:outline-none focus:border-[#4589ff]"
-                  />
-                </div>
-                <div className="sm:col-span-7 flex items-end">
-                  <button
-                    type="submit"
-                    disabled={paying}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-white font-medium text-sm py-3.5 px-6 transition shadow-lg"
-                  >
-                    {paying ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4" />
-                        Pay KES {priceKes.toLocaleString()} with M-Pesa → Launch
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-[#9ca3af] pt-1">
-                <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  100% refund if fewer than 30% of your leads show up.
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  className="underline hover:text-white"
-                >
-                  ← Back to leads
-                </button>
-              </div>
-            </div>
-          </form>
+          </motion.form>
         )}
-      </div>
-    </div>
+      </AnimatePresence>
+    </Dialog>
   );
 }
-

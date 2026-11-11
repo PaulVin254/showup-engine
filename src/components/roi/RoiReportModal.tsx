@@ -1,9 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Check, Copy, Printer, TrendingUp, X } from "lucide-react";
+import { Check, Copy, Printer } from "lucide-react";
 import { ShowUpEvent, ShowUpRegistrant, ShowUpScheduledMessage } from "@/lib/types";
-import { formatEatDate } from "@/lib/default-templates";
+import { fmtEat } from "@/lib/lifecycle";
+import { computeMetrics } from "@/lib/pipeline";
+import { cn } from "@/lib/cn";
+import { Button, Dialog, inputCls, labelCls } from "@/components/ui/kit";
 
 interface RoiReportModalProps {
   isOpen: boolean;
@@ -13,247 +16,107 @@ interface RoiReportModalProps {
   messages: ShowUpScheduledMessage[];
 }
 
-export function RoiReportModal({
-  isOpen,
-  onClose,
-  event,
-  registrants,
-  messages,
-}: RoiReportModalProps) {
+const PASS_COST_KES = 1500;
+const kes = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
+
+export function RoiReportModal({ isOpen, onClose, event, registrants, messages }: RoiReportModalProps) {
   const [adSpend, setAdSpend] = useState(event.ad_spend_kes || 50000);
   const [baselinePct, setBaselinePct] = useState(event.baseline_showup_rate || 20);
   const [offerPrice, setOfferPrice] = useState(event.offer_price_kes || 25000);
-  const [closeRatePct, setCloseRatePct] = useState(event.expected_close_rate || 6);
+  const [closePct, setClosePct] = useState(event.expected_close_rate || 6);
   const [copied, setCopied] = useState(false);
 
-  if (!isOpen) return null;
+  const m = computeMetrics(registrants, messages);
+  const total = Math.max(m.total, 1);
+  const baselineAttendees = Math.round((baselinePct / 100) * total);
+  const extra = Math.max(0, m.attended - baselineAttendees);
+  const costBefore = baselineAttendees > 0 ? adSpend / baselineAttendees : adSpend;
+  const costNow = m.attended > 0 ? adSpend / m.attended : adSpend;
+  const extraSales = (extra * closePct) / 100;
+  const extraRevenue = extraSales * offerPrice;
+  const roiX = Math.max(1, Math.round(extraRevenue / PASS_COST_KES));
+  const { fullStr } = { fullStr: `${fmtEat(event.starts_at, { date: true })} EAT` };
 
-  const totalReg = Math.max(registrants.length, 1);
-  const attendedCount = registrants.filter(
-    (r) => r.clicked_join_link || r.zoom_verified
-  ).length;
-  const actualShowupPct = Math.round((attendedCount / totalReg) * 100);
+  const shareText = `*${event.title}* · attendance report (${fullStr})
 
-  const sentMsgs = messages.filter((m) =>
-    ["sent", "delivered", "read"].includes(m.status)
-  ).length;
-  const readMsgs = messages.filter((m) => m.status === "read").length;
-  const readRatePct =
-    sentMsgs > 0 ? Math.min(98, Math.round((readMsgs / sentMsgs) * 100) + 25) : 94;
+Registered: ${m.total}
+Attended live: ${m.attended} (${m.showupPct}%)
+Baseline (${baselinePct}%): ${baselineAttendees}
+Extra people in the room: +${extra}
+${m.deliveryPct !== null ? `WhatsApp delivery: ${m.deliveryPct}%` + (m.readPct !== null ? ` · read ${m.readPct}%` : "") + "\n" : ""}
+Cost per attendee: ${kes(costNow)} (was ${kes(costBefore)})
+Est. extra sales: ${kes(extraRevenue)} at ${closePct}% close on ${kes(offerPrice)}
+Event pass: ${kes(PASS_COST_KES)} → ~${roiX}x return`;
 
-  const baselineAttendees = Math.round((baselinePct / 100) * totalReg);
-  const extraAttendees = Math.max(0, attendedCount - baselineAttendees);
-
-  const costPerRegistrant = Math.round(adSpend / totalReg);
-  const costPerAttendeeBefore =
-    baselineAttendees > 0 ? Math.round(adSpend / baselineAttendees) : adSpend;
-  const costPerAttendeeNow =
-    attendedCount > 0 ? Math.round(adSpend / attendedCount) : adSpend;
-
-  const adSpendRescued = Math.max(
-    0,
-    Math.round(extraAttendees * costPerRegistrant)
-  );
-  const estimatedExtraSalesCount = Number(
-    ((extraAttendees * closeRatePct) / 100).toFixed(1)
-  );
-  const estimatedExtraRevenueKes = Math.round(
-    (extraAttendees * (closeRatePct / 100)) * offerPrice
-  );
-  const subscriptionCostKes = 4999;
-  const roiMultiplier = Math.max(
-    1,
-    Math.round(estimatedExtraRevenueKes / subscriptionCostKes)
-  );
-
-  const { fullStr } = formatEatDate(event.starts_at);
-
-  const whatsappShareText = `📊 *SHOWUP ENGINE ROI REPORT: ${event.title}* (${fullStr})
-
-*REGISTRATIONS & WHATSAPP ENGAGEMENT*
-• Total Registrants: ${registrants.length}
-• WhatsApp Read Rate: ${readRatePct}%
-
-*LIVE ATTENDANCE UPLIFT*
-• Previous Baseline (${baselinePct}%): ${baselineAttendees} attendees
-• Live Joined via ShowUp Engine (${actualShowupPct}%): ${attendedCount} attendees
-👉 *EXTRA ATTENDEES RESCUED: +${extraAttendees} people*
-
-*AD SPEND & REVENUE IMPACT*
-• Cost per Attendee Before: Ksh ${costPerAttendeeBefore.toLocaleString()}
-• Cost per Attendee Now: Ksh ${costPerAttendeeNow.toLocaleString()}
-• Estimated Extra Course Sales (${closeRatePct}% close @ Ksh ${offerPrice.toLocaleString()}): *Ksh ${estimatedExtraRevenueKes.toLocaleString()}*
-• ShowUp Engine Starter Plan: Ksh 4,999/mo (${roiMultiplier}x ROI)`;
-
-  const handleCopyReport = () => {
-    navigator.clipboard.writeText(whatsappShareText);
+  const copyReport = () => {
+    navigator.clipboard.writeText(shareText);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    setTimeout(() => setCopied(false), 1800);
   };
 
+  const inputs: Array<[string, number, (n: number) => void]> = [
+    ["Ad spend (KES)", adSpend, setAdSpend],
+    ["Baseline show-up %", baselinePct, setBaselinePct],
+    ["Offer price (KES)", offerPrice, setOfferPrice],
+    ["Close rate %", closePct, setClosePct],
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-surface border border-white/[0.08] rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl my-8">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-canvas/60">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-electric-subtle border border-electric/30 flex items-center justify-center text-electric-hover">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">
-                Post-Webinar ROI &amp; Attendance Proof Report
-              </h3>
-              <p className="text-xs text-[#94a3b8]">
-                {event.title} • {fullStr}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-[#94a3b8] hover:text-white p-1.5 rounded-lg hover:bg-white/[0.08]"
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      title="ROI report"
+      description={`${event.title} · ${fullStr}`}
+      width="max-w-2xl"
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => window.print()} icon={<Printer className="w-3.5 h-3.5" />}>
+            Print / PDF
+          </Button>
+          <Button
+            variant="brand"
+            onClick={copyReport}
+            icon={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
           >
-            <X className="w-5 h-5" />
-          </button>
+            {copied ? "Copied" : "Copy for WhatsApp"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {inputs.map(([label, value, set]) => (
+            <div key={label}>
+              <label className={cn(labelCls, "text-[11px] truncate")}>{label}</label>
+              <input
+                type="number"
+                min={0}
+                value={value}
+                onChange={(e) => set(Number(e.target.value) || 0)}
+                className={cn(inputCls, "font-mono tabular-nums")}
+              />
+            </div>
+          ))}
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Interactive Inputs so Host Can Type Their Own Numbers */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-canvas p-4 rounded-xl border border-white/[0.08]">
-            <div>
-              <label className="block text-[11px] text-[#94a3b8] mb-1">
-                Meta Ad Spend (Ksh)
-              </label>
-              <input
-                type="number"
-                value={adSpend}
-                onChange={(e) => setAdSpend(Number(e.target.value) || 0)}
-                className="w-full px-2.5 py-1.5 rounded-full bg-surface border border-white/[0.08] text-white text-sm font-semibold"
-              />
+        <div className="grid sm:grid-cols-3 rounded-md border border-white/[0.08] divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08]">
+          {[
+            { l: "Show-up", v: `${m.showupPct}%`, s: `+${extra} vs ${baselinePct}% baseline`, t: "text-[#00a884]" },
+            { l: "Cost / attendee", v: kes(costNow), s: `was ${kes(costBefore)}`, t: "text-white" },
+            { l: "Est. extra sales", v: kes(extraRevenue), s: `~${extraSales.toFixed(1)} sales · ${roiX}x pass`, t: "text-white" },
+          ].map((x) => (
+            <div key={x.l} className="px-4 py-3">
+              <div className="text-[11px] uppercase tracking-[0.08em] text-slate-500">{x.l}</div>
+              <div className={cn("mt-1 font-mono tabular-nums text-[20px] font-medium", x.t)}>{x.v}</div>
+              <div className="mt-0.5 text-[11.5px] text-slate-500">{x.s}</div>
             </div>
-            <div>
-              <label className="block text-[11px] text-[#94a3b8] mb-1">
-                Past Show-Up Baseline (%)
-              </label>
-              <input
-                type="number"
-                value={baselinePct}
-                onChange={(e) => setBaselinePct(Number(e.target.value) || 15)}
-                className="w-full px-2.5 py-1.5 rounded-full bg-surface border border-white/[0.08] text-white text-sm font-semibold"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-[#94a3b8] mb-1">
-                Offer / Course Price (Ksh)
-              </label>
-              <input
-                type="number"
-                value={offerPrice}
-                onChange={(e) => setOfferPrice(Number(e.target.value) || 0)}
-                className="w-full px-2.5 py-1.5 rounded-full bg-surface border border-white/[0.08] text-white text-sm font-semibold"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-[#94a3b8] mb-1">
-                Live Close Rate (%)
-              </label>
-              <input
-                type="number"
-                value={closeRatePct}
-                onChange={(e) => setCloseRatePct(Number(e.target.value) || 5)}
-                className="w-full px-2.5 py-1.5 rounded-full bg-surface border border-white/[0.08] text-white text-sm font-semibold"
-              />
-            </div>
-          </div>
-
-          {/* KPI Comparison Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-canvas border border-white/[0.08]">
-              <div className="text-xs text-[#94a3b8]">Attendance Jump</div>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-electric-hover">
-                  {actualShowupPct}%
-                </span>
-                <span className="text-xs text-[#94a3b8] line-through">
-                  vs {baselinePct}% before
-                </span>
-              </div>
-              <div className="mt-2 text-xs text-[#7db4ff] font-medium">
-                +{extraAttendees} extra live attendees in the room
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-canvas border border-white/[0.08]">
-              <div className="text-xs text-[#94a3b8]">Cost Per Live Attendee</div>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-white">
-                  Ksh {costPerAttendeeNow.toLocaleString()}
-                </span>
-                <span className="text-xs text-red-400 line-through">
-                  Ksh {costPerAttendeeBefore.toLocaleString()}
-                </span>
-              </div>
-              <div className="mt-2 text-xs text-[#94a3b8]">
-                Ksh {adSpendRescued.toLocaleString()} of ad spend rescued
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-electric-subtle border border-electric/30">
-              <div className="text-xs text-[#7db4ff]">Estimated Extra Sales</div>
-              <div className="mt-1 text-2xl font-extrabold text-electric-hover">
-                Ksh {estimatedExtraRevenueKes.toLocaleString()}
-              </div>
-              <div className="mt-2 text-xs text-[#7db4ff] font-medium">
-                ~{estimatedExtraSalesCount} extra sales • {roiMultiplier}x ROI on Ksh 4,999
-              </div>
-            </div>
-          </div>
-
-          {/* Raw WhatsApp Formatted Preview */}
-          <div className="bg-canvas border border-white/[0.08] rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-[#94a3b8] uppercase tracking-wider">
-                Ready-to-Send WhatsApp ROI Summary (For Client Closing)
-              </span>
-              <span className="text-[11px] text-electric-hover">
-                Pillar 4 Retention Script Ready
-              </span>
-            </div>
-            <pre className="text-xs text-slate-200 whitespace-pre-wrap font-mono leading-relaxed bg-surface p-3.5 rounded-lg border border-white/[0.08]">
-              {whatsappShareText}
-            </pre>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.08] hover:bg-white/[0.08] text-xs font-medium text-slate-200"
-            >
-              <Printer className="w-4 h-4" />
-              Print / Save PDF Report
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCopyReport}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm text-white bg-electric hover:bg-electric-hover transition"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Copied for WhatsApp!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  Copy WhatsApp ROI Report
-                </>
-              )}
-            </button>
-          </div>
+          ))}
         </div>
+
+        <pre className="text-[12px] leading-relaxed whitespace-pre-wrap font-mono text-slate-300 rounded-md border border-white/[0.08] bg-white/[0.02] p-3.5">
+          {shareText}
+        </pre>
       </div>
-    </div>
+    </Dialog>
   );
 }
-
