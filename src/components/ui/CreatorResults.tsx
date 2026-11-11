@@ -27,6 +27,8 @@ export interface CreatorResultsProps {
   ctaHref?: string;
   ctaLabel?: string;
   className?: string;
+  /** Show niche filter tabs (default true). */
+  showFilters?: boolean;
 }
 
 const NICHE_LABEL: Record<CreatorNiche | "all", string> = {
@@ -141,6 +143,7 @@ export function CreatorResults({
   ctaHref = "/dashboard?setup=1",
   ctaLabel = "Create your webinar free",
   className = "",
+  showFilters = true,
 }: CreatorResultsProps) {
   const [filter, setFilter] = useState<CreatorNiche | "all">("all");
   const niches = Array.from(new Set(results.map((r) => r.niche)));
@@ -148,7 +151,7 @@ export function CreatorResults({
 
   return (
     <div className={`max-w-5xl mx-auto ${className}`}>
-      <div className="flex flex-wrap justify-center gap-2 mb-8">
+      <div className={`flex flex-wrap justify-center gap-2 mb-8 ${showFilters ? "" : "hidden"}`}>
         {(["all", ...niches] as (CreatorNiche | "all")[]).map((n) => (
           <button
             key={n}
