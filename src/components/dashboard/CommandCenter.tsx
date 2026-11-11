@@ -12,10 +12,12 @@ import {
   ExternalLink,
   FileUp,
   Loader2,
+  MoreHorizontal,
   Pencil,
   Play,
   Radio,
   Smartphone,
+  Trash2,
   Users,
   Webhook,
 } from "lucide-react";
@@ -42,7 +44,7 @@ import {
 } from "@/lib/pipeline";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { cn } from "@/lib/cn";
-import { Button, SPRING_SNAPPY, SectionLabel, StatusPill } from "@/components/ui/kit";
+import { Button, Dialog, SPRING_SNAPPY, SectionLabel, StatusPill } from "@/components/ui/kit";
 import { PhonePreview } from "./PhonePreview";
 
 export const SOURCE_LABEL: Record<ShowUpRegistrant["source"], string> = {
@@ -69,6 +71,7 @@ interface CommandCenterProps {
   onToast: (msg: string) => void;
   onOpenRegistrants: () => void;
   onEdit: () => void;
+  onDeleteEvent?: (eventId: string) => void;
   onLaunch: () => void;
   onImportFile: (file: File) => void;
 }
@@ -115,13 +118,30 @@ export function CommandCenter(props: CommandCenterProps) {
     onToast,
     onOpenRegistrants,
     onEdit,
+    onDeleteEvent,
     onLaunch,
     onImportFile,
   } = props;
 
   const [previewStage, setPreviewStage] = useState<SequenceStage>("instant_welcome");
   const [copied, setCopied] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Close menu on outside click
+  React.useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [menuOpen]);
 
   const start = new Date(event.starts_at).getTime();
   const msToStart = start - now;
@@ -226,6 +246,44 @@ export function CommandCenter(props: CommandCenterProps) {
               <Pencil className="w-3 h-3" />
               Edit
             </button>
+            {onDeleteEvent && (
+              <div className="relative inline-block" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-md hover:bg-white/[0.08] text-slate-400 hover:text-white transition"
+                  title="More actions"
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
+                {menuOpen && (
+                  <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1 z-40 w-44 rounded-lg bg-[#14171d] border border-white/[0.1] shadow-2xl py-1 text-[12.5px] backdrop-blur-md">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onEdit();
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-slate-300 hover:text-white hover:bg-white/[0.06] flex items-center gap-2"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit webinar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setConfirmDeleteOpen(true);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/[0.08] flex items-center gap-2"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete webinar…
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -529,6 +587,40 @@ export function CommandCenter(props: CommandCenterProps) {
           />
         </div>
       </div>
+
+      {/* Delete Event Confirmation Dialog */}
+      <Dialog
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        title="Delete webinar"
+        description="Are you sure you want to permanently delete this webinar?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setConfirmDeleteOpen(false);
+                onDeleteEvent?.(event.id);
+              }}
+              icon={<Trash2 className="w-3.5 h-3.5" />}
+            >
+              Delete permanently
+            </Button>
+          </>
+        }
+      >
+        <div className="text-[13px] text-slate-300 leading-relaxed space-y-2">
+          <p>
+            Permanently delete <strong className="text-white">&quot;{event.title}&quot;</strong>?
+          </p>
+          <p className="text-[12px] text-slate-400">
+            This will remove all scheduled WhatsApp sequence messages and attendee tracking links for this room. This action cannot be undone.
+          </p>
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -37,11 +37,12 @@ export const labelCls = "block text-[12px] font-medium text-slate-400 mb-1.5";
 /* ------------------------------------------------------------------ */
 /* Button                                                              */
 /* ------------------------------------------------------------------ */
-type ButtonVariant = "brand" | "secondary" | "ghost" | "success";
+type ButtonVariant = "brand" | "secondary" | "ghost" | "success" | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   brand: "bg-[#1877f2] text-white hover:bg-[#2e86f8] border border-transparent",
   success: "bg-[#00a884] text-white hover:bg-[#00b894] border border-transparent",
+  danger: "bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30",
   secondary:
     "bg-white/[0.04] text-slate-200 hover:bg-white/[0.08] border border-white/[0.08]",
   ghost:

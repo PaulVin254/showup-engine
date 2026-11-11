@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Plus, Smartphone } from "lucide-react";
@@ -24,6 +24,7 @@ import { EventSetupWizard } from "@/components/wizard/EventSetupWizard";
 import { HostAuthModal } from "@/components/auth/HostAuthModal";
 import { RoiReportModal } from "@/components/roi/RoiReportModal";
 import { CommandCenter } from "@/components/dashboard/CommandCenter";
+import { EventSwitcher } from "@/components/dashboard/EventSwitcher";
 import { FinishedReport } from "@/components/dashboard/FinishedReport";
 import { ZeroState } from "@/components/dashboard/ZeroState";
 import { RegistrantsSheet } from "@/components/dashboard/RegistrantsSheet";
@@ -32,6 +33,7 @@ import { BrandWordmark } from "@/components/BrandMark";
 import { Button, EASE_OUT_FAST, SPRING_SNAPPY, ToastItem, ToastStack } from "@/components/ui/kit";
 
 const DEV_MODE_KEY = "showup_dev_mode";
+const LAST_EVENT_KEY = "showup_last_selected_event_id";
 
 export default function DashboardPage() {
   const now = useNow(1000);
@@ -92,9 +94,26 @@ export default function DashboardPage() {
       setPayments(data.payments || []);
       if (data.metaConfigId) setMetaConfigId(data.metaConfigId);
       if (data.metaAppId) setMetaAppId(data.metaAppId);
-      setSelectedEventId((prev) =>
-        prev && loaded.some((e) => e.id === prev) ? prev : loaded[0]?.id || ""
-      );
+
+      const urlParam =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("event")
+          : null;
+      const stored =
+        typeof window !== "undefined"
+          ? localStorage.getItem(LAST_EVENT_KEY)
+          : null;
+
+      const targetId =
+        (urlParam && loaded.some((e) => e.id === urlParam) && urlParam) ||
+        (stored && loaded.some((e) => e.id === stored) && stored) ||
+        loaded[0]?.id ||
+        "";
+
+      setSelectedEventId(targetId);
+      if (typeof window !== "undefined" && targetId) {
+        localStorage.setItem(LAST_EVENT_KEY, targetId);
+      }
     } finally {
       setLoading(false);
     }
@@ -129,6 +148,97 @@ export default function DashboardPage() {
   const eventMessages = activeEvent
     ? scheduledMessages.filter((m) => m.event_id === activeEvent.id)
     : [];
+
+  const handleSelectEvent = useCallback((id: string) => {
+    setSelectedEventId(id);
+    if (typeof window !== "undefined") {
+      if (id) {
+        localStorage.setItem(LAST_EVENT_KEY, id);
+        const url = new URL(window.location.href);
+        url.searchParams.set("event", id);
+        window.history.replaceState({}, "", url.toString());
+      } else {
+        localStorage.removeItem(LAST_EVENT_KEY);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("event");
+        window.history.replaceState({}, "", url.toString());
+      }
+    }
+  }, []);
+
+  const handleDeleteEvent = useCallback(
+    async (eventId: string) => {
+      try {
+        const res = await fetch(`/api/events?id=${eventId}`, {
+          method: "DELETE",
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to delete webinar");
+
+        showToast("Webinar deleted", "success");
+        setEvents((prev) => {
+          const next = prev.filter((e) => e.id !== eventId);
+          if (selectedEventId === eventId) {
+            handleSelectEvent(next[0]?.id || "");
+          }
+          return next;
+        });
+      } catch (e: unknown) {
+        showToast(
+          e instanceof Error ? e.message : "Could not delete webinar",
+          "error"
+        );
+      }
+    },
+    [selectedEventId, handleSelectEvent, showToast]
+  );
+
+  const handleCleanEmptyTests = useCallback(async () => {
+    if (!activeEvent) return;
+    const regEventIds = new Set(registrants.map((r) => r.event_id));
+    const emptyEvents = events.filter(
+      (e) => e.id !== activeEvent.id && !regEventIds.has(e.id)
+    );
+    if (emptyEvents.length === 0) {
+      showToast("No empty test events to clean up", "success");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Delete ${emptyEvents.length} empty test events with 0 registrants? (Your active webinar "${activeEvent.title}" will be kept)`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `/api/events?cleanup=empty&keepId=${encodeURIComponent(activeEvent.id)}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to clean test events");
+
+      const count = data.deletedCount || emptyEvents.length;
+      showToast(`Cleaned up ${count} empty test events`, "success");
+      const emptyIds = new Set(emptyEvents.map((e) => e.id));
+      setEvents((prev) => prev.filter((e) => !emptyIds.has(e.id)));
+    } catch (e: unknown) {
+      showToast(
+        e instanceof Error ? e.message : "Could not clean test events",
+        "error"
+      );
+    }
+  }, [activeEvent, events, registrants, showToast]);
+
+  const emptyCount = useMemo(() => {
+    if (!activeEvent) return 0;
+    const regEventIds = new Set(registrants.map((r) => r.event_id));
+    return events.filter(
+      (e) => e.id !== activeEvent.id && !regEventIds.has(e.id)
+    ).length;
+  }, [activeEvent, events, registrants]);
 
   // Live data: poll faster while the room is open.
   useEffect(() => {
@@ -310,19 +420,19 @@ export default function DashboardPage() {
             })}
           </nav>
 
-          {view === "events" && events.length > 1 && (
-            <select
-              aria-label="Select event"
-              value={activeEvent?.id || ""}
-              onChange={(e) => setSelectedEventId(e.target.value)}
-              className="hidden sm:block h-7 max-w-[200px] md:max-w-[220px] truncate rounded-md bg-white/[0.04] border border-white/[0.08] px-2 text-[12px] text-slate-200 outline-none focus:border-[#1877f2]"
-            >
-              {events.map((ev) => (
-                <option key={ev.id} value={ev.id} className="bg-[#17191e]">
-                  {ev.title}
-                </option>
-              ))}
-            </select>
+          {view === "events" && events.length > 0 && (
+            <div className="hidden sm:block">
+              <EventSwitcher
+                events={events}
+                activeEvent={activeEvent}
+                registrants={registrants}
+                now={now}
+                onSelectEvent={handleSelectEvent}
+                onNewWebinar={() => openWizard()}
+                onCleanEmptyTests={handleCleanEmptyTests}
+                emptyCount={emptyCount}
+              />
+            </div>
           )}
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5 shrink-0">
@@ -366,22 +476,22 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Mobile multi-event switcher row */}
-        {view === "events" && events.length > 1 && (
-          <div className="sm:hidden px-3 py-1.5 border-t border-white/[0.06] flex items-center gap-2">
-            <span className="text-[11px] text-slate-500 shrink-0">Event</span>
-            <select
-              aria-label="Select event"
-              value={activeEvent?.id || ""}
-              onChange={(e) => setSelectedEventId(e.target.value)}
-              className="h-7 flex-1 min-w-0 truncate rounded-md bg-white/[0.04] border border-white/[0.08] px-2 text-[12px] text-slate-200 outline-none focus:border-[#1877f2]"
-            >
-              {events.map((ev) => (
-                <option key={ev.id} value={ev.id} className="bg-[#17191e]">
-                  {ev.title}
-                </option>
-              ))}
-            </select>
+        {/* Mobile event switcher row */}
+        {view === "events" && events.length > 0 && (
+          <div className="sm:hidden px-3 py-1.5 border-t border-white/[0.06] flex items-center justify-between gap-2">
+            <span className="text-[11px] text-slate-500 shrink-0 font-medium">Room</span>
+            <div className="flex-1 min-w-0">
+              <EventSwitcher
+                events={events}
+                activeEvent={activeEvent}
+                registrants={registrants}
+                now={now}
+                onSelectEvent={handleSelectEvent}
+                onNewWebinar={() => openWizard()}
+                onCleanEmptyTests={handleCleanEmptyTests}
+                emptyCount={emptyCount}
+              />
+            </div>
           </div>
         )}
       </header>
@@ -443,6 +553,7 @@ export default function DashboardPage() {
                 onToast={showToast}
                 onOpenRegistrants={() => setRegistrantsOpen(true)}
                 onEdit={() => openWizard({ event: activeEvent })}
+                onDeleteEvent={handleDeleteEvent}
                 onLaunch={() => openWizard({ event: activeEvent, step: 3 })}
                 onImportFile={(f) => handleCsvFile(f, "registrants")}
               />
@@ -467,13 +578,14 @@ export default function DashboardPage() {
         }
         originUrl={originUrl}
         onClose={() => setWizardOpen(false)}
+        onDelete={handleDeleteEvent}
         onEventSaved={async (saved) => {
           setWizardEvent(saved);
-          setSelectedEventId(saved.id);
+          handleSelectEvent(saved.id);
           await loadWorkspace();
         }}
         onLaunched={async (id, msg) => {
-          setSelectedEventId(id);
+          handleSelectEvent(id);
           await loadWorkspace();
           setWizardOpen(false);
           setView("events");

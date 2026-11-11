@@ -10,3 +10,4 @@ export function useNow(intervalMs = 1000): number {
   }, [intervalMs]);
   return now;
 }
+

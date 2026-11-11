@@ -217,3 +217,119 @@ export async function POST(req: Request) {
   }
 }
 
+export async function DELETE(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const eventId = url.searchParams.get("id");
+    const cleanup = url.searchParams.get("cleanup");
+    const keepId = url.searchParams.get("keepId");
+
+    const { tenant } = await getActiveTenant();
+    const supabaseReady = await checkSupabaseMigrationStatus();
+
+    // Mode A: Clean up empty test events
+    if (cleanup === "empty") {
+      if (supabaseReady && supabase) {
+        const { data: allEvents } = await supabase
+          .from("showup_events")
+          .select("id")
+          .eq("tenant_id", tenant.id);
+
+        const { data: allRegistrants } = await supabase
+          .from("showup_registrants")
+          .select("event_id")
+          .eq("tenant_id", tenant.id);
+
+        const registeredEventIds = new Set(
+          (allRegistrants || []).map((r) => r.event_id)
+        );
+
+        const targetEventIds = (allEvents || [])
+          .map((e) => e.id)
+          .filter((id) => id !== keepId && !registeredEventIds.has(id));
+
+        if (targetEventIds.length > 0) {
+          await supabase
+            .from("showup_scheduled_messages")
+            .delete()
+            .in("event_id", targetEventIds);
+
+          await supabase
+            .from("showup_events")
+            .delete()
+            .in("id", targetEventIds);
+        }
+
+        return NextResponse.json({
+          success: true,
+          deletedCount: targetEventIds.length,
+        });
+      }
+
+      // Local DB fallback
+      const db = readLocalDb();
+      const registeredEventIds = new Set(db.registrants.map((r) => r.event_id));
+      const targetEvents = db.events.filter(
+        (e) =>
+          (tenant.id === "guest" || e.tenant_id === tenant.id) &&
+          e.id !== keepId &&
+          !registeredEventIds.has(e.id)
+      );
+      const targetIds = new Set(targetEvents.map((e) => e.id));
+
+      db.events = db.events.filter((e) => !targetIds.has(e.id));
+      db.scheduled_messages = db.scheduled_messages.filter(
+        (m) => !targetIds.has(m.event_id)
+      );
+      writeLocalDb(db);
+
+      return NextResponse.json({
+        success: true,
+        deletedCount: targetEvents.length,
+      });
+    }
+
+    // Mode B: Single event deletion
+    if (!eventId) {
+      return NextResponse.json({ error: "Missing event id" }, { status: 400 });
+    }
+
+    if (supabaseReady && supabase) {
+      await supabase
+        .from("showup_scheduled_messages")
+        .delete()
+        .eq("event_id", eventId);
+
+      await supabase
+        .from("showup_registrants")
+        .delete()
+        .eq("event_id", eventId);
+
+      const { error } = await supabase
+        .from("showup_events")
+        .delete()
+        .eq("id", eventId)
+        .eq("tenant_id", tenant.id);
+
+      if (error) throw new Error(error.message);
+
+      return NextResponse.json({ success: true, deletedId: eventId });
+    }
+
+    const db = readLocalDb();
+    db.events = db.events.filter((e) => e.id !== eventId);
+    db.registrants = db.registrants.filter((r) => r.event_id !== eventId);
+    db.scheduled_messages = db.scheduled_messages.filter(
+      (m) => m.event_id !== eventId
+    );
+    writeLocalDb(db);
+
+    return NextResponse.json({ success: true, deletedId: eventId });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to delete event" },
+      { status: 500 }
+    );
+  }
+}
+

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Upload } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Trash2, Upload } from "lucide-react";
 import { SenderMode, ShowUpEvent, ShowUpRegistrant, ShowUpTenant } from "@/lib/types";
 import { normalizeKenyanPhone, formatPhoneDisplay } from "@/lib/phone";
 import {
@@ -38,6 +38,7 @@ interface EventSetupWizardProps {
   onLaunched: (eventId: string, message: string) => Promise<void>;
   onOpenEmbeddedSignup: () => void;
   onToast: (msg: string) => void;
+  onDelete?: (eventId: string) => void;
 }
 
 const EAT_OFFSET_MS = 3 * 3600 * 1000;
@@ -64,6 +65,7 @@ export function EventSetupWizard({
   onLaunched,
   onOpenEmbeddedSignup,
   onToast,
+  onDelete,
 }: EventSetupWizardProps) {
   const [step, setStep] = useState<1 | 2 | 3>(initialEvent ? initialStep : 1);
   const [dir, setDir] = useState<1 | -1>(1);
@@ -215,9 +217,33 @@ export function EventSetupWizard({
   const footer =
     step === 1 ? (
       <>
-        <span className="text-[11.5px] text-slate-500">Times are East Africa Time (UTC+3)</span>
+        {initialEvent && onDelete ? (
+          <Button
+            type="button"
+            variant="danger"
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Permanently delete "${initialEvent.title}"? This cannot be undone.`
+                )
+              ) {
+                onDelete(initialEvent.id);
+                onClose();
+              }
+            }}
+            icon={<Trash2 className="w-3.5 h-3.5" />}
+          >
+            Delete webinar
+          </Button>
+        ) : (
+          <span className="text-[11.5px] text-slate-500">Times are East Africa Time (UTC+3)</span>
+        )}
+        <div className="flex-1" />
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
         <Button type="submit" form="wiz-step1" variant="brand" loading={saving}>
-          Continue
+          {initialEvent ? "Save changes" : "Continue"}
           <ArrowRight className="w-3.5 h-3.5" />
         </Button>
       </>
