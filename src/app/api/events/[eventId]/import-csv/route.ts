@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { normalizeKenyanPhone } from "@/lib/phone";
 import { scheduleAndFireSequenceForRegistrant } from "@/lib/scheduler";

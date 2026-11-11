@@ -141,3 +141,44 @@ export function computeMetrics(
   };
 }
 
+/**
+ * Normalizes user-entered meeting links:
+ * - Bare domain (e.g. meet.google.com/xyz or zoom.us/j/123) -> https://...
+ * - Trims whitespace
+ */
+export function normalizeJoinUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+}
+
+export interface MeetingPlatformInfo {
+  name: string;
+  badgeColor: string;
+}
+
+export function detectMeetingPlatform(url: string): MeetingPlatformInfo | null {
+  const lower = url.toLowerCase().trim();
+  if (!lower) return null;
+  if (lower.includes("meet.google.com")) {
+    return { name: "Google Meet", badgeColor: "text-emerald-400" };
+  }
+  if (lower.includes("zoom.us")) {
+    return { name: "Zoom", badgeColor: "text-blue-400" };
+  }
+  if (lower.includes("youtube.com") || lower.includes("youtu.be")) {
+    return { name: "YouTube Live", badgeColor: "text-red-400" };
+  }
+  if (lower.includes("teams.microsoft.com") || lower.includes("teams.live.com")) {
+    return { name: "Microsoft Teams", badgeColor: "text-indigo-400" };
+  }
+  if (lower.includes("webex.com")) {
+    return { name: "Webex", badgeColor: "text-cyan-400" };
+  }
+  return null;
+}
+
+

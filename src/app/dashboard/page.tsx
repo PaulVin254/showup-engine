@@ -15,7 +15,8 @@ import {
 } from "@/lib/types";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { csvToLeadRows } from "@/lib/csv";
-import { deriveLifecycle, fmtEat, useNow } from "@/lib/lifecycle";
+import { deriveLifecycle, fmtEat } from "@/lib/lifecycle";
+import { useNow } from "@/lib/use-now";
 import { stageTemplate } from "@/lib/pipeline";
 import { cn } from "@/lib/cn";
 import { EmbeddedSignupModal } from "@/components/whatsapp/EmbeddedSignupModal";

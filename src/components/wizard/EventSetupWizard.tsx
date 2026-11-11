@@ -6,7 +6,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Upload } from "lucide-react";
 import { SenderMode, ShowUpEvent, ShowUpRegistrant, ShowUpTenant } from "@/lib/types";
 import { normalizeKenyanPhone, formatPhoneDisplay } from "@/lib/phone";
-import { PIPELINE_STAGES, stageTimingLabel } from "@/lib/pipeline";
+import {
+  PIPELINE_STAGES,
+  detectMeetingPlatform,
+  normalizeJoinUrl,
+  stageTimingLabel,
+} from "@/lib/pipeline";
 import { csvToLeadRows } from "@/lib/csv";
 import { cn } from "@/lib/cn";
 import {
@@ -78,6 +83,9 @@ export function EventSetupWizard({
     return d.toISOString().slice(0, 16);
   });
   const [joinUrl, setJoinUrl] = useState(initialEvent?.join_url || "");
+  const [addLinkLater, setAddLinkLater] = useState(
+    initialEvent ? !initialEvent.join_url : false
+  );
   const [hostPhone, setHostPhone] = useState(initialPhone || tenant.phone_e164 || "");
   const [saving, setSaving] = useState(false);
 
@@ -124,6 +132,7 @@ export function EventSetupWizard({
       return;
     }
     setSaving(true);
+    const finalJoinUrl = addLinkLater ? "" : normalizeJoinUrl(joinUrl);
     try {
       const data = await postJson("/api/events", {
         eventId: currentEvent?.id,
@@ -131,7 +140,7 @@ export function EventSetupWizard({
         hostName: tenant.business_name.split(" ")[0] || "Host",
         hostPhone: hostPhone.trim(),
         startsAt: eatLocalToIso(startsAtLocal),
-        joinUrl: joinUrl.trim(),
+        joinUrl: finalJoinUrl,
         senderMode,
       });
       setCurrentEvent(data.event);
@@ -342,15 +351,45 @@ export function EventSetupWizard({
               </div>
             </div>
             <div>
-              <label className={labelCls}>Join link (Zoom, Meet or YouTube)</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className={labelCls}>Join link (Zoom, Meet or YouTube)</label>
+                {!addLinkLater && detectMeetingPlatform(joinUrl) && (
+                  <span className={cn("text-[11px] font-medium", detectMeetingPlatform(joinUrl)!.badgeColor)}>
+                    ✓ {detectMeetingPlatform(joinUrl)!.name}
+                  </span>
+                )}
+              </div>
               <input
-                required
-                type="url"
-                placeholder="https://zoom.us/j/…"
+                type="text"
+                disabled={addLinkLater}
+                placeholder="e.g. meet.google.com/xyz or zoom.us/j/…"
                 value={joinUrl}
                 onChange={(e) => setJoinUrl(e.target.value)}
-                className={cn(inputCls, "font-mono")}
+                onBlur={() => {
+                  if (joinUrl.trim()) setJoinUrl(normalizeJoinUrl(joinUrl));
+                }}
+                className={cn(inputCls, "font-mono", addLinkLater && "opacity-40 cursor-not-allowed")}
               />
+              <label className="mt-2.5 flex items-center gap-2 text-[12px] text-slate-400 cursor-pointer select-none hover:text-slate-300 transition">
+                <input
+                  type="checkbox"
+                  checked={addLinkLater}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setAddLinkLater(checked);
+                    if (checked) {
+                      setJoinUrl("");
+                    }
+                  }}
+                  className="w-3.5 h-3.5 rounded bg-white/[0.04] border-white/[0.15] text-[#1877f2] focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                />
+                <span>I don&apos;t have the link yet (I&apos;ll add it before going live)</span>
+              </label>
+              {addLinkLater && (
+                <p className="mt-1.5 text-[11px] text-slate-500 leading-relaxed">
+                  You can collect registrations right away. Stage 5 (Live Link) requires your URL before T−5m.
+                </p>
+              )}
             </div>
           </motion.form>
         )}
@@ -552,6 +591,9 @@ export function EventSetupWizard({
                       {s.step}
                     </span>
                     <span className="text-white">{s.label}</span>
+                    {s.key === "live_now" && !currentEvent.join_url && (
+                      <StatusPill tone="amber" dot={false}>Link pending</StatusPill>
+                    )}
                     <span className="ml-auto font-mono tabular-nums text-[11.5px] text-slate-500">
                       {previewEvent ? stageTimingLabel(s, previewEvent) : s.rule}
                     </span>

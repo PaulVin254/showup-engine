@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { ShowUpEvent } from "./types";
 
 export type Lifecycle = "zero" | "scheduled" | "live" | "finished";
@@ -64,14 +63,5 @@ export function relativeAgo(iso: string, now: number): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
-}
-
-export function useNow(intervalMs = 1000): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-  return now;
 }
 

@@ -1,5 +1,8 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { normalizeKenyanPhone } from "@/lib/phone";
+import { normalizeJoinUrl } from "@/lib/pipeline";
 import {
   checkSupabaseMigrationStatus,
   findOrCreateTenantByPhone,
@@ -43,9 +46,9 @@ export async function POST(req: Request) {
       eventId,
     } = body;
 
-    if (!title || !startsAt || !joinUrl) {
+    if (!title || !startsAt) {
       return NextResponse.json(
-        { error: "Title, startsAt, and joinUrl are required" },
+        { error: "Title and startsAt are required" },
         { status: 400 }
       );
     }
@@ -79,6 +82,8 @@ export async function POST(req: Request) {
       .replace(/^-|-$/g, "");
     const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
 
+    const sanitizedJoinUrl = joinUrl ? normalizeJoinUrl(String(joinUrl)) : "";
+
     const newEvent: ShowUpEvent = {
       id: crypto.randomUUID(),
       tenant_id: tenant.id,
@@ -89,7 +94,7 @@ export async function POST(req: Request) {
         teaserHook || "the exact step-by-step framework to achieve results",
       starts_at: new Date(startsAt).toISOString(),
       timezone: "Africa/Nairobi",
-      join_url: joinUrl,
+      join_url: sanitizedJoinUrl,
       meta_form_id: metaFormId || null,
       webhook_secret: `whsec_${Math.random().toString(36).slice(2, 12)}`,
       stage_templates: stageTemplates || {

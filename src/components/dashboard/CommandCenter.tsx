@@ -190,15 +190,26 @@ export function CommandCenter(props: CommandCenterProps) {
             {event.title}
           </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-slate-400">
-            <a
-              href={event.join_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 hover:text-white transition max-w-[200px] sm:max-w-[240px]"
-            >
-              <span className="truncate">{event.join_url.replace(/^https?:\/\//, "")}</span>
-              <ExternalLink className="w-3 h-3 shrink-0" />
-            </a>
+            {event.join_url ? (
+              <a
+                href={event.join_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 hover:text-white transition max-w-[200px] sm:max-w-[240px]"
+              >
+                <span className="truncate">{event.join_url.replace(/^https?:\/\//, "")}</span>
+                <ExternalLink className="w-3 h-3 shrink-0" />
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="inline-flex items-center gap-1 text-amber-300 hover:text-amber-200 transition font-medium"
+              >
+                <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
+                <span>Meeting link pending · click to add</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => copy("reg", regUrl, "Registration link copied")}
@@ -254,6 +265,21 @@ export function CommandCenter(props: CommandCenterProps) {
           </p>
           <Button size="sm" variant="success" onClick={onLaunch} icon={<Smartphone className="w-3.5 h-3.5" />}>
             Launch · KES 1,500 via M-Pesa
+          </Button>
+        </div>
+      )}
+
+      {/* Missing live meeting link banner */}
+      {!event.join_url && (
+        <div className="px-4 sm:px-6 py-2.5 border-b border-amber-500/25 bg-amber-500/[0.08] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[12.5px] text-amber-200">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Meeting link not added yet.</strong> Stage 5 (Live Link) requires your Zoom or Google Meet URL before T−5m.
+            </span>
+          </div>
+          <Button size="sm" variant="brand" onClick={onEdit} icon={<Pencil className="w-3.5 h-3.5" />}>
+            Add link now
           </Button>
         </div>
       )}
@@ -323,6 +349,9 @@ export function CommandCenter(props: CommandCenterProps) {
                         <span className="flex items-center gap-2">
                           <span className="text-[13px] font-medium text-white">{st.label}</span>
                           {isNext && <StatusPill tone="blue" dot={false}>Next</StatusPill>}
+                          {st.key === "live_now" && !event.join_url && (
+                            <StatusPill tone="amber" dot={false}>Link pending</StatusPill>
+                          )}
                         </span>
                         <span className="block text-[11.5px] text-slate-500 font-mono tabular-nums truncate">
                           {stageTimingLabel(st, event)}
