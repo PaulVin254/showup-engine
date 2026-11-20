@@ -1,6 +1,8 @@
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   ShowUpEvent,
@@ -34,10 +36,77 @@ export const DEFAULT_TENANT_ID = "11111111-1111-1111-1111-111111111111";
 export const DEMO_EVENT_ID = "22222222-2222-2222-2222-222222222222";
 export const TENANT_COOKIE_NAME = "showup_tenant_id";
 
+function getSessionSecret(): string {
+  return (
+    process.env.SESSION_SECRET ||
+    process.env.META_APP_SECRET ||
+    process.env.QSTASH_CURRENT_SIGNING_KEY ||
+    "showup-local-dev-session-secret"
+  );
+}
+
+export function signTenantSession(tenantId: string): string {
+  const sig = crypto
+    .createHmac("sha256", getSessionSecret())
+    .update(tenantId)
+    .digest("hex");
+  return `${tenantId}.${sig}`;
+}
+
+export function verifyTenantSession(rawCookieValue: string): string | null {
+  const dotIdx = rawCookieValue.lastIndexOf(".");
+  if (dotIdx <= 0) return null;
+
+  const tenantId = rawCookieValue.slice(0, dotIdx);
+  const providedSig = rawCookieValue.slice(dotIdx + 1);
+  if (!tenantId || !providedSig) return null;
+
+  const expectedSig = crypto
+    .createHmac("sha256", getSessionSecret())
+    .update(tenantId)
+    .digest("hex");
+
+  const providedBuf = Buffer.from(providedSig, "utf8");
+  const expectedBuf = Buffer.from(expectedSig, "utf8");
+  if (providedBuf.length !== expectedBuf.length) return null;
+
+  if (!crypto.timingSafeEqual(providedBuf, expectedBuf)) return null;
+  return tenantId;
+}
+
+export function setTenantSessionCookie(
+  res: NextResponse,
+  tenantId: string
+): NextResponse {
+  if (tenantId && tenantId !== "guest") {
+    res.cookies.set(TENANT_COOKIE_NAME, signTenantSession(tenantId), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60,
+    });
+  }
+  return res;
+}
+
+export function clearTenantSessionCookie(res: NextResponse): NextResponse {
+  res.cookies.set(TENANT_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  return res;
+}
+
 export function getCookieTenantId(): string | null {
   try {
     const cookieStore = cookies();
-    return cookieStore.get(TENANT_COOKIE_NAME)?.value || null;
+    const raw = cookieStore.get(TENANT_COOKIE_NAME)?.value;
+    if (!raw) return null;
+    return verifyTenantSession(raw);
   } catch {
     return null;
   }
@@ -54,11 +123,10 @@ function createInitialSeed(): LocalDbSchema {
     business_name: "Nairobi Wealth & Academy Ltd",
     email: "founder@eris.co.ke",
     phone_e164: "254727838624",
-    waba_id: "1317581530311429",
-    phone_number_id: "1017704028092663",
+    waba_id: process.env.SHOWUP_SHARED_WABA_ID || "1238919841044022",
+    phone_number_id: process.env.SHOWUP_SHARED_PHONE_NUMBER_ID || "1017704028092663",
     display_phone_number: "+254 727 838624",
-    access_token:
-      "EAANdEphmfOABS9h93GUiCBhIXLZBCpssom5Oq5ggqucOVLhOo7IRWNQfeVi0tUDcxkZCMgyveiNMNQMwzKD3OXfaZCHHPW44TqhkucbSxmDkzPk9fsxyTOcG55mtZBinrZBNUXsGTSWaZASejYvSTE2ZB3Qthzu6RjjHmRP2tx0ZCfsZCKZCuuhxlClYDM2C0uBeQrS23aksZCypGkx9p7aocDS44BDDgNOwfXyjO3fwbZAiDFmpj7lFSq7itsCc0ZBAagHR9YhuecHS9TI3q2fTIZCzZC5P7AiEwZDZD",
+    access_token: "demo_access_token",
     waba_status: "connected",
     connected_at: now.toISOString(),
     plan_tier: "pilot",

@@ -111,7 +111,6 @@ export function buildStageVariables(params: {
     case "live_now":
       return {
         bodyVariables: [firstName, event.title, trackedJoinUrl],
-        buttonUrlSuffix: registrant.tracking_token,
       };
   }
 }

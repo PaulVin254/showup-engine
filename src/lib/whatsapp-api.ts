@@ -20,6 +20,8 @@ export interface SendTemplateMessageResult {
   wamid?: string;
   simulated?: boolean;
   error?: string;
+  metaErrorCode?: number;
+  metaErrorSubcode?: number;
   raw?: unknown;
 }
 
@@ -336,6 +338,12 @@ export async function sendWhatsAppTemplateMessage(
       return {
         success: false,
         error: data?.error?.message || `Meta API HTTP ${res.status}`,
+        metaErrorCode:
+          typeof data?.error?.code === "number" ? data.error.code : undefined,
+        metaErrorSubcode:
+          typeof data?.error?.error_subcode === "number"
+            ? data.error.error_subcode
+            : undefined,
         raw: data,
       };
     }
@@ -355,6 +363,49 @@ export async function sendWhatsAppTemplateMessage(
   }
 }
 
+function isTemplateUnavailableError(res: SendTemplateMessageResult): boolean {
+  const code = res.metaErrorCode;
+  if (code === 132001 || code === 131058 || code === 132015) return true;
+  const msg = res.error?.toLowerCase() || "";
+  return (
+    msg.includes("132001") ||
+    msg.includes("131058") ||
+    msg.includes("does not exist") ||
+    msg.includes("template is paused")
+  );
+}
+
+/**
+ * 9. Send a 6-digit Host Login OTP via Meta's official AUTHENTICATION template
+ * on the verified shared Eris Engineering WhatsApp number.
+ * Never falls back to unrelated utility/marketing templates.
+ */
+export async function sendWhatsAppOtpMessage(params: {
+  toPhoneE164: string;
+  otpCode: string;
+  templateName?: string;
+  languageCode?: string;
+}): Promise<SendTemplateMessageResult> {
+  const sharedPhoneId =
+    process.env.SHOWUP_SHARED_PHONE_NUMBER_ID || "1017704028092663";
+  const sharedToken =
+    process.env.SHOWUP_SHARED_ACCESS_TOKEN || "demo_access_token";
+  const templateName =
+    params.templateName ||
+    process.env.SHOWUP_OTP_TEMPLATE_NAME ||
+    "showup_host_otp";
+  const languageCode = params.languageCode || "en";
+
+  return sendWhatsAppTemplateMessage({
+    phoneNumberId: sharedPhoneId,
+    accessToken: sharedToken,
+    toPhoneE164: params.toPhoneE164,
+    templateName,
+    languageCode,
+    bodyVariables: [params.otpCode],
+  });
+}
+
 export interface SmartDispatchInput {
   tenant: ShowUpTenant;
   senderMode?: SenderMode;
@@ -370,14 +421,15 @@ export interface SmartDispatchInput {
 export interface SmartDispatchResult extends SendTemplateMessageResult {
   senderUsed: "own_waba" | "shared_showup";
   fellBackFromOwnWaba?: boolean;
-  usedApprovedFallbackTemplate?: boolean;
+  ownWabaError?: string;
 }
 
 /**
- * 9. Smart Hybrid WhatsApp Router:
+ * 10. Smart Hybrid WhatsApp Router:
  * - Attempts Host's Own WABA first when `senderMode === 'own_waba'` and WABA is connected.
- * - Automatically falls back to Verified Shared ShowUp Number if Host's templates are still PENDING.
- * - Automatically falls back to approved template `ksl_class3_reminder_v2` if custom template is still PENDING Meta review.
+ * - Falls back to Verified Shared ShowUp Number (Eris Engineering) ONLY when the host's
+ *   own template is still PENDING/missing in Meta (not on invalid recipient or token/billing errors).
+ * - Never silently substitutes unrelated templates.
  */
 export async function dispatchSmartWhatsAppMessage(
   input: SmartDispatchInput
@@ -391,7 +443,6 @@ export async function dispatchSmartWhatsAppMessage(
     bodyVariables,
     namedVariables,
     buttonUrlSuffix,
-    recipientFirstName = "Friend",
   } = input;
 
   const sharedPhoneId =
@@ -405,6 +456,8 @@ export async function dispatchSmartWhatsAppMessage(
     Boolean(tenant.phone_number_id) &&
     Boolean(tenant.access_token) &&
     !tenant.access_token?.startsWith("demo_");
+
+  let ownWabaError: string | undefined;
 
   // 1. Try Host's Own WABA first if selected & connected
   if (wantsOwnWaba && tenant.phone_number_id && tenant.access_token) {
@@ -425,10 +478,21 @@ export async function dispatchSmartWhatsAppMessage(
         senderUsed: "own_waba",
       };
     }
-    // If own WABA failed (e.g. newly provisioned templates still PENDING review), fall through to Shared ShowUp Number!
+
+    // Only fall back to Shared ShowUp Number if the host's template isn't approved yet.
+    // Surface token expiry, billing errors, or invalid recipient errors directly.
+    if (!isTemplateUnavailableError(ownRes)) {
+      return {
+        ...ownRes,
+        senderUsed: "own_waba",
+        ownWabaError: ownRes.error,
+      };
+    }
+
+    ownWabaError = ownRes.error;
   }
 
-  // 2. Dispatch via Verified Shared ShowUp Number
+  // 2. Dispatch via Verified Shared ShowUp Number (Eris Engineering)
   const sharedRes = await sendWhatsAppTemplateMessage({
     phoneNumberId: sharedPhoneId,
     accessToken: sharedToken,
@@ -440,49 +504,11 @@ export async function dispatchSmartWhatsAppMessage(
     buttonUrlSuffix,
   });
 
-  if (sharedRes.success) {
-    return {
-      ...sharedRes,
-      senderUsed: "shared_showup",
-      fellBackFromOwnWaba: wantsOwnWaba,
-    };
-  }
-
-  // 3. If custom webinar template on Shared Number is still PENDING review (132001), fallback to approved template
-  const isTemplatePending =
-    sharedRes.error?.includes("132001") ||
-    sharedRes.error?.includes("does not exist") ||
-    sharedRes.error?.includes("131058");
-
-  if (isTemplatePending) {
-    const fallbackName =
-      recipientFirstName ||
-      (bodyVariables && bodyVariables[0]) ||
-      "Friend";
-
-    const approvedFallbackRes = await sendWhatsAppTemplateMessage({
-      phoneNumberId: sharedPhoneId,
-      accessToken: sharedToken,
-      toPhoneE164,
-      templateName: "ksl_class3_reminder_v2",
-      languageCode: "en",
-      namedVariables: { name: fallbackName },
-    });
-
-    if (approvedFallbackRes.success) {
-      return {
-        ...approvedFallbackRes,
-        senderUsed: "shared_showup",
-        fellBackFromOwnWaba: wantsOwnWaba,
-        usedApprovedFallbackTemplate: true,
-      };
-    }
-  }
-
   return {
     ...sharedRes,
     senderUsed: "shared_showup",
     fellBackFromOwnWaba: wantsOwnWaba,
+    ownWabaError,
   };
 }
 

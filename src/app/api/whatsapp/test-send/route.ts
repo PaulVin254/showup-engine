@@ -100,13 +100,24 @@ export async function POST(req: Request) {
     }
 
     // 6. Proceed to send live WhatsApp message
-    const sharedPhoneId = process.env.SHOWUP_SHARED_PHONE_NUMBER_ID || "";
+    const sharedPhoneId =
+      process.env.SHOWUP_SHARED_PHONE_NUMBER_ID || "1017704028092663";
     const sharedToken = process.env.SHOWUP_SHARED_ACCESS_TOKEN || "";
 
+    const hasOwnLiveToken =
+      tenant.waba_status === "connected" &&
+      Boolean(tenant.phone_number_id) &&
+      Boolean(tenant.access_token) &&
+      !tenant.access_token?.startsWith("demo_");
+
     const effectivePhoneNumberId =
-      tenant.phone_number_id || sharedPhoneId || "demo_phone_id";
+      (hasOwnLiveToken ? tenant.phone_number_id : null) ||
+      sharedPhoneId ||
+      "demo_phone_id";
     const effectiveAccessToken =
-      tenant.access_token || sharedToken || "demo_access_token";
+      (hasOwnLiveToken ? tenant.access_token : null) ||
+      sharedToken ||
+      "demo_access_token";
 
     const bodyVariables =
       templateName === "hello_world"
@@ -124,35 +135,25 @@ export async function POST(req: Request) {
 
     if (!result.success) {
       const isPending =
+        result.metaErrorCode === 132001 ||
+        result.metaErrorCode === 131058 ||
         result.error?.includes("132001") ||
-        result.error?.includes("does not exist") ||
-        result.error?.includes("131058");
+        result.error?.includes("does not exist");
 
       if (isPending) {
-        // Dispatch the approved class reminder template so the recipient gets a real WhatsApp message on their phone right now!
-        const fallbackRes = await sendWhatsAppTemplateMessage({
-          phoneNumberId: effectivePhoneNumberId,
-          accessToken: effectiveAccessToken,
-          toPhoneE164: normalized,
-          templateName: "ksl_class3_reminder_v2",
-          languageCode: "en",
-          namedVariables: { name: recipientName },
-        });
-
-        return NextResponse.json({
-          success: true,
-          toPhoneE164: normalized,
-          wamid: fallbackRes.wamid || `wamid.APPROVED_FALLBACK_${Date.now()}`,
-          simulated: false,
-          previewText,
-          senderLabel,
-          message: fallbackRes.success
-            ? `Live WhatsApp reminder delivered to +${normalized}! (Dispatched using your approved template 'ksl_class3_reminder_v2' while new custom templates finish Meta review).`
-            : `Connected to +254 727 838624! Your 5 webinar templates are currently in Meta review (PENDING).`,
-        });
+        return NextResponse.json(
+          {
+            error: `Template '${templateName}' is still awaiting Meta approval on Eris Engineering (+254 727 838624). Please retry in a few minutes.`,
+            metaErrorCode: result.metaErrorCode,
+          },
+          { status: 502 }
+        );
       }
 
-      return NextResponse.json({ error: result.error, raw: result.raw }, { status: 400 });
+      return NextResponse.json(
+        { error: result.error || "Meta Cloud API rejected test send", raw: result.raw },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json({

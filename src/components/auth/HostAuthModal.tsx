@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { normalizeKenyanPhone } from "@/lib/phone";
 import { cn } from "@/lib/cn";
@@ -17,10 +17,27 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [devHint, setDevHint] = useState<string | null>(null);
 
   const normalized = normalizeKenyanPhone(phone);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setError(null);
+      setDevHint(null);
+    }
+  }, [isOpen]);
 
   const call = async (body: Record<string, unknown>) => {
     const res = await fetch("/api/auth/host-otp", {
@@ -29,7 +46,15 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
+    if (!res.ok) {
+      const err = new Error(data.error || "Request failed") as Error & {
+        retryAfterSeconds?: number;
+      };
+      if (typeof data.retryAfterSeconds === "number") {
+        err.retryAfterSeconds = data.retryAfterSeconds;
+      }
+      throw err;
+    }
     return data;
   };
 
@@ -39,7 +64,11 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const e = err as Error & { retryAfterSeconds?: number };
+      if (typeof e.retryAfterSeconds === "number") {
+        setResendCooldown(e.retryAfterSeconds);
+      }
+      setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -50,8 +79,33 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
     return run(async () => {
       const data = await call({ action: "send_otp", phone });
       setDevHint(data.devHint || null);
+      setResendCooldown(
+        typeof data.resendCooldownSeconds === "number" ? data.resendCooldownSeconds : 60
+      );
       setStep("otp");
     });
+  };
+
+  const resendOtp = async () => {
+    if (resendCooldown > 0 || resending || loading) return;
+    setError(null);
+    setResending(true);
+    try {
+      const data = await call({ action: "send_otp", phone });
+      setDevHint(data.devHint || null);
+      setCode("");
+      setResendCooldown(
+        typeof data.resendCooldownSeconds === "number" ? data.resendCooldownSeconds : 60
+      );
+    } catch (err) {
+      const e = err as Error & { retryAfterSeconds?: number };
+      if (typeof e.retryAfterSeconds === "number") {
+        setResendCooldown(e.retryAfterSeconds);
+      }
+      setError(e instanceof Error ? e.message : "Could not resend code");
+    } finally {
+      setResending(false);
+    }
   };
 
   const verifyOtp = (e: React.FormEvent) => {
@@ -83,7 +137,7 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
           <button
             type="button"
             onClick={loadDemo}
-            disabled={loading}
+            disabled={loading || resending}
             className="text-[12px] text-slate-400 hover:text-white underline underline-offset-4 transition disabled:opacity-50"
           >
             Load sample data
@@ -166,6 +220,8 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
                     onClick={() => {
                       setStep("phone");
                       setCode("");
+                      setError(null);
+                      setDevHint(null);
                     }}
                     className="text-[11.5px] text-[#5aa2ff] hover:underline mb-1.5"
                   >
@@ -176,6 +232,7 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
                   required
                   autoFocus
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={6}
                   placeholder="••••••"
                   value={code}
@@ -185,6 +242,26 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
                     "h-11 text-center font-mono tabular-nums text-lg tracking-[0.4em]"
                   )}
                 />
+                <div className="mt-2 flex items-center justify-between text-[11.5px]">
+                  <span className="text-slate-500">Valid for 10 min</span>
+                  <button
+                    type="button"
+                    onClick={resendOtp}
+                    disabled={resendCooldown > 0 || resending || loading}
+                    className={cn(
+                      "font-mono tabular-nums transition",
+                      resendCooldown > 0 || resending
+                        ? "text-slate-500 cursor-not-allowed"
+                        : "text-[#5aa2ff] hover:underline"
+                    )}
+                  >
+                    {resending
+                      ? "Sending…"
+                      : resendCooldown > 0
+                        ? `Resend in ${resendCooldown}s`
+                        : "Resend code"}
+                  </button>
+                </div>
                 {devHint && (
                   <div className="mt-1.5 text-[11px] font-mono text-slate-500">
                     Dev code: <span className="text-slate-300">{devHint}</span>

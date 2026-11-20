@@ -12,7 +12,7 @@ import {
 import {
   findOrCreateTenantByPhone,
   getActiveTenant,
-  TENANT_COOKIE_NAME,
+  setTenantSessionCookie,
   updateTenantWabaConnection,
 } from "@/lib/store";
 
@@ -120,11 +120,7 @@ export async function POST(req: Request) {
     });
 
     if (updatedTenant.id && updatedTenant.id !== "guest") {
-      res.cookies.set(TENANT_COOKIE_NAME, updatedTenant.id, {
-        path: "/",
-        maxAge: 30 * 24 * 60 * 60,
-        sameSite: "lax",
-      });
+      setTenantSessionCookie(res, updatedTenant.id);
     }
     return res;
   } catch (err: unknown) {

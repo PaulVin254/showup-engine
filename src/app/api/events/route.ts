@@ -8,21 +8,14 @@ import {
   findOrCreateTenantByPhone,
   getActiveTenant,
   readLocalDb,
+  setTenantSessionCookie,
   supabase,
-  TENANT_COOKIE_NAME,
   writeLocalDb,
 } from "@/lib/store";
 import { ShowUpEvent } from "@/lib/types";
 
 function withTenantCookie(res: NextResponse, tenantId: string): NextResponse {
-  if (tenantId && tenantId !== "guest") {
-    res.cookies.set(TENANT_COOKIE_NAME, tenantId, {
-      path: "/",
-      maxAge: 30 * 24 * 60 * 60,
-      sameSite: "lax",
-    });
-  }
-  return res;
+  return setTenantSessionCookie(res, tenantId);
 }
 
 export async function POST(req: Request) {

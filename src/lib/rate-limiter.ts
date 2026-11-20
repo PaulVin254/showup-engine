@@ -202,3 +202,75 @@ export async function checkGlobalDailyCap(): Promise<{ allowed: boolean }> {
   });
   return { allowed: res.allowed };
 }
+
+/**
+ * 4. Host OTP IP Rate Limit: Max 10 OTP send requests per hour per IP.
+ */
+export async function checkOtpIpRateLimit(
+  clientIp: string
+): Promise<{ allowed: boolean }> {
+  const cleanIp = clientIp.replace(/[^a-zA-Z0-9.:_-]/g, "").slice(0, 45);
+  const res = await checkAndIncrementLimit({
+    key: `otp_ip_limit:${cleanIp}`,
+    maxCount: 10,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  });
+  return { allowed: res.allowed };
+}
+
+/**
+ * 5. Host OTP Per-Phone Resend Cooldown: Max 1 OTP send per 60 seconds per phone.
+ */
+export async function checkOtpPhoneCooldown(
+  phoneE164: string
+): Promise<{ allowed: boolean }> {
+  const res = await checkAndIncrementLimit({
+    key: `otp_cooldown:${phoneE164}`,
+    maxCount: 1,
+    windowMs: 60 * 1000, // 60 seconds
+  });
+  return { allowed: res.allowed };
+}
+
+/**
+ * 6. Host OTP Per-Phone Daily Limit: Max 5 OTP sends per 24 hours per phone.
+ */
+export async function checkOtpPhoneDailyLimit(
+  phoneE164: string
+): Promise<{ allowed: boolean }> {
+  const eatDate = new Date(Date.now() + 3 * 3600 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const res = await checkAndIncrementLimit({
+    key: `otp_daily:${phoneE164}:${eatDate}`,
+    maxCount: 5,
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  });
+  return { allowed: res.allowed };
+}
+
+/**
+ * 7. Host OTP Verification Attempt Guard: Max 5 attempts per active 10-minute OTP window.
+ */
+export async function recordOtpVerifyAttempt(
+  phoneE164: string
+): Promise<{ allowed: boolean; count: number }> {
+  return checkAndIncrementLimit({
+    key: `otp_verify_attempts:${phoneE164}`,
+    maxCount: 5,
+    windowMs: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+export async function clearOtpVerifyAttempts(phoneE164: string): Promise<void> {
+  const key = `otp_verify_attempts:${phoneE164}`;
+  memoryStore.delete(key);
+  const supabaseReady = await checkSupabaseMigrationStatus();
+  if (supabaseReady && supabase) {
+    try {
+      await supabase.from("showup_rate_limits").delete().eq("key", key);
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+}
