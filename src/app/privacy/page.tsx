@@ -109,10 +109,10 @@ export default function PrivacyPolicyPage() {
             future scheduled messages. Hosts or registrants may request full
             deletion of their account or personal data by emailing{" "}
             <a
-              href="mailto:founder@eris.co.ke"
+              href="mailto:paul@eris.co.ke"
               className="text-[#60a5fa] underline"
             >
-              founder@eris.co.ke
+              paul@eris.co.ke
             </a>
             . All verified deletion requests are completed within 7 business
             days in compliance with the Kenya Data Protection Act, 2019 and Meta

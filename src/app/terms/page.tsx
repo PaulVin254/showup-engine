@@ -74,10 +74,10 @@ export default function TermsOfServicePage() {
           <p>
             For support, billing, or compliance inquiries, contact{" "}
             <a
-              href="mailto:founder@eris.co.ke"
+              href="mailto:paul@eris.co.ke"
               className="text-[#60a5fa] underline"
             >
-              founder@eris.co.ke
+              paul@eris.co.ke
             </a>
             .
           </p>

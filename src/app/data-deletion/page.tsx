@@ -99,10 +99,10 @@ export default function UserDataDeletionPage() {
             To request permanent erasure of your ShowUp Engine account, hosted
             events, Meta tokens, or registrant records from our database, email{" "}
             <a
-              href="mailto:founder@eris.co.ke?subject=Data%20Deletion%20Request%20-%20ShowUp%20Engine"
+              href="mailto:paul@eris.co.ke?subject=Data%20Deletion%20Request%20-%20ShowUp%20Engine"
               className="text-[#60a5fa] underline"
             >
-              founder@eris.co.ke
+              paul@eris.co.ke
             </a>{" "}
             with the subject{" "}
             <code className="text-slate-200">Data Deletion Request - ShowUp Engine</code> and include:
@@ -128,10 +128,10 @@ export default function UserDataDeletionPage() {
             ShowUp Engine message. To permanently erase your name, phone number,
             and click logs after opting out, send a deletion request to{" "}
             <a
-              href="mailto:founder@eris.co.ke?subject=Data%20Deletion%20Request%20-%20ShowUp%20Engine"
+              href="mailto:paul@eris.co.ke?subject=Data%20Deletion%20Request%20-%20ShowUp%20Engine"
               className="text-[#60a5fa] underline"
             >
-              founder@eris.co.ke
+              paul@eris.co.ke
             </a>
             .
           </p>

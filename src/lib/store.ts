@@ -121,7 +121,7 @@ function createInitialSeed(): LocalDbSchema {
   const tenant: ShowUpTenant = {
     id: DEFAULT_TENANT_ID,
     business_name: "Nairobi Wealth & Academy Ltd",
-    email: "founder@eris.co.ke",
+    email: "paul@eris.co.ke",
     phone_e164: "254727838624",
     waba_id: process.env.SHOWUP_SHARED_WABA_ID || "1238919841044022",
     phone_number_id: process.env.SHOWUP_SHARED_PHONE_NUMBER_ID || "1017704028092663",
