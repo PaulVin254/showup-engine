@@ -116,7 +116,12 @@ export default function PrivacyPolicyPage() {
             </a>
             . All verified deletion requests are completed within 7 business
             days in compliance with the Kenya Data Protection Act, 2019 and Meta
-            Platform Terms.
+            Platform Terms. For step-by-step instructions on removing your Meta
+            integration or requesting full erasure, see our{" "}
+            <Link href="/data-deletion" className="text-[#60a5fa] underline">
+              Data Deletion Instructions
+            </Link>
+            .
           </p>
         </section>
       </main>

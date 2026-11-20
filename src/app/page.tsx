@@ -285,6 +285,10 @@ export default function LandingPage() {
           <Link href="/terms" className="hover:text-white transition">
             Terms of Service
           </Link>
+          <span>·</span>
+          <Link href="/data-deletion" className="hover:text-white transition">
+            Data Deletion
+          </Link>
         </div>
       </footer>
 
