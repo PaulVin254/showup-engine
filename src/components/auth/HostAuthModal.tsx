@@ -20,7 +20,6 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
   const [resending, setResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [devHint, setDevHint] = useState<string | null>(null);
 
   const normalized = normalizeKenyanPhone(phone);
 
@@ -35,7 +34,6 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
   useEffect(() => {
     if (!isOpen) {
       setError(null);
-      setDevHint(null);
     }
   }, [isOpen]);
 
@@ -78,7 +76,6 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
     e.preventDefault();
     return run(async () => {
       const data = await call({ action: "send_otp", phone });
-      setDevHint(data.devHint || null);
       setResendCooldown(
         typeof data.resendCooldownSeconds === "number" ? data.resendCooldownSeconds : 60
       );
@@ -92,7 +89,6 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
     setResending(true);
     try {
       const data = await call({ action: "send_otp", phone });
-      setDevHint(data.devHint || null);
       setCode("");
       setResendCooldown(
         typeof data.resendCooldownSeconds === "number" ? data.resendCooldownSeconds : 60
@@ -117,13 +113,6 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
     });
   };
 
-  const loadDemo = () =>
-    run(async () => {
-      const data = await call({ action: "load_demo" });
-      await onAuthenticated(data.message || "Sample data loaded");
-      onClose();
-    });
-
   return (
     <Dialog
       open={isOpen}
@@ -132,17 +121,9 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
       description="We'll send a 6-digit code to your WhatsApp."
       width="max-w-sm"
       footer={
-        <>
-          <span className="text-[11.5px] text-slate-500">No password needed</span>
-          <button
-            type="button"
-            onClick={loadDemo}
-            disabled={loading || resending}
-            className="text-[12px] text-slate-400 hover:text-white underline underline-offset-4 transition disabled:opacity-50"
-          >
-            Load sample data
-          </button>
-        </>
+        <span className="text-[11.5px] text-slate-500">
+          Passwordless WhatsApp verification
+        </span>
       }
     >
       <div className="space-y-4">
@@ -221,7 +202,6 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
                       setStep("phone");
                       setCode("");
                       setError(null);
-                      setDevHint(null);
                     }}
                     className="text-[11.5px] text-[#5aa2ff] hover:underline mb-1.5"
                   >
@@ -262,11 +242,6 @@ export function HostAuthModal({ isOpen, onClose, onAuthenticated }: HostAuthModa
                         : "Resend code"}
                   </button>
                 </div>
-                {devHint && (
-                  <div className="mt-1.5 text-[11px] font-mono text-slate-500">
-                    Dev code: <span className="text-slate-300">{devHint}</span>
-                  </div>
-                )}
               </div>
               <Button
                 type="submit"

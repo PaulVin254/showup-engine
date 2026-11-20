@@ -12,6 +12,7 @@ import {
 import {
   findOrCreateTenantByPhone,
   getActiveTenant,
+  sanitizeTenantForClient,
   setTenantSessionCookie,
   updateTenantWabaConnection,
 } from "@/lib/store";
@@ -19,77 +20,44 @@ import {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const {
-      code,
-      wabaId,
-      phoneNumberId,
-      accessToken: manualAccessToken,
-      displayPhoneNumber: manualDisplayPhone,
-      pin = "123456",
-    } = body;
+    const { code, wabaId, phoneNumberId, pin = "123456" } = body;
 
-    if (!wabaId || !phoneNumberId) {
+    if (!code || !wabaId || !phoneNumberId) {
       return NextResponse.json(
-        { error: "Missing wabaId or phoneNumberId from Meta Embedded Signup." },
+        { error: "Missing code, wabaId, or phoneNumberId from Meta Embedded Signup." },
         { status: 400 }
       );
     }
 
     const { tenant } = await getActiveTenant();
 
-    // 1. Obtain Access Token (either via OAuth code exchange or direct System User token)
-    let clientAccessToken = manualAccessToken;
-    if (!clientAccessToken && code) {
-      const exchanged = await exchangeCodeForToken(code);
-      clientAccessToken = exchanged.accessToken;
+    // 1. Exchange Meta OAuth authorization code for a live access token
+    const exchanged = await exchangeCodeForToken(String(code));
+    const clientAccessToken = exchanged.accessToken;
+
+    // 2. Execute Meta Onboarding Graph API calls
+    let resolvedDisplayPhone = "";
+    try {
+      await subscribeAppToWaba(wabaId, clientAccessToken);
+    } catch {
+      // Non-fatal: webhook subscription can also be managed at the Meta App level
     }
 
-    if (!clientAccessToken) {
-      return NextResponse.json(
-        {
-          error:
-            "Neither an OAuth authorization code nor a direct access token was provided.",
-        },
-        { status: 400 }
-      );
+    try {
+      await registerPhoneNumber(phoneNumberId, clientAccessToken, pin);
+    } catch {
+      // Phone number may already be registered
     }
 
-    const stepsLog: Record<string, unknown> = {};
+    const phoneDetails = await fetchPhoneNumberDetails(phoneNumberId, clientAccessToken);
+    if (phoneDetails?.display_phone_number) {
+      resolvedDisplayPhone = phoneDetails.display_phone_number;
+    }
 
-    // 2. If real token (not demo), execute the 4 Meta Onboarding Graph API calls
-    let resolvedDisplayPhone = manualDisplayPhone || "+254 712 345 678";
-    if (!clientAccessToken.startsWith("demo_")) {
-      try {
-        stepsLog.subscribeWebhook = await subscribeAppToWaba(wabaId, clientAccessToken);
-      } catch (e: unknown) {
-        stepsLog.subscribeWebhookError = e instanceof Error ? e.message : String(e);
-      }
-
-      try {
-        stepsLog.registerPhone = await registerPhoneNumber(
-          phoneNumberId,
-          clientAccessToken,
-          pin
-        );
-      } catch (e: unknown) {
-        stepsLog.registerPhoneError = e instanceof Error ? e.message : String(e);
-      }
-
-      const phoneDetails = await fetchPhoneNumberDetails(phoneNumberId, clientAccessToken);
-      if (phoneDetails?.display_phone_number) {
-        resolvedDisplayPhone = phoneDetails.display_phone_number;
-      }
-
-      try {
-        stepsLog.templatesProvisioned = await provisionDefaultTemplatesInMeta(
-          wabaId,
-          clientAccessToken
-        );
-      } catch (e: unknown) {
-        stepsLog.templatesProvisionedError = e instanceof Error ? e.message : String(e);
-      }
-    } else {
-      stepsLog.mode = "Demo / Sandbox WABA Connection Activated";
+    try {
+      await provisionDefaultTemplatesInMeta(wabaId, clientAccessToken);
+    } catch {
+      // Templates can also be synced/created from Settings
     }
 
     // 3. Persist WABA connection to Tenant record
@@ -105,16 +73,15 @@ export async function POST(req: Request) {
 
     const updatedTenant = await updateTenantWabaConnection({
       tenantId: targetTenant.id,
-      wabaId,
-      phoneNumberId,
-      displayPhoneNumber: resolvedDisplayPhone,
+      wabaId: String(wabaId),
+      phoneNumberId: String(phoneNumberId),
+      displayPhoneNumber: resolvedDisplayPhone || null,
       accessToken: clientAccessToken,
     });
 
     const res = NextResponse.json({
       success: true,
-      tenant: updatedTenant,
-      stepsLog,
+      tenant: sanitizeTenantForClient(updatedTenant),
       message:
         "Official WhatsApp Business Account connected & 5 Webinar Templates provisioned!",
     });
@@ -133,4 +100,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

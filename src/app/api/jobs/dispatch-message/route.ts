@@ -1,7 +1,45 @@
 export const dynamic = "force-dynamic";
 
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { buildStageVariables } from "@/lib/scheduler";
+
+function verifyQStashSignature(token: string | null): boolean {
+  if (!token) return false;
+  const keys = [
+    process.env.QSTASH_CURRENT_SIGNING_KEY,
+    process.env.QSTASH_NEXT_SIGNING_KEY,
+  ].filter((k): k is string => Boolean(k));
+  if (keys.length === 0) return false;
+
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  const [headerB64, payloadB64, sigB64] = parts;
+  const signingInput = `${headerB64}.${payloadB64}`;
+
+  for (const key of keys) {
+    const expected = crypto
+      .createHmac("sha256", key)
+      .update(signingInput)
+      .digest("base64url");
+    const a = Buffer.from(sigB64, "utf8");
+    const b = Buffer.from(expected, "utf8");
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(payloadB64, "base64url").toString("utf8")
+        ) as { exp?: number };
+        if (typeof payload.exp === "number" && Date.now() / 1000 > payload.exp) {
+          return false;
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  }
+  return false;
+}
 import {
   checkSupabaseMigrationStatus,
   getActiveTenant,
@@ -49,7 +87,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Event not found" }, { status: 404 });
       }
 
-      const { tenant } = await getActiveTenant(event.tenant_id);
+      const { tenant: sessionTenant, isGuest } = await getActiveTenant();
+      if (isGuest) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (sessionTenant.id !== event.tenant_id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const tenant = sessionTenant;
       const stageKey = stage as SequenceStage;
       const templateName =
         event.stage_templates?.[stageKey] || "event_registration_confirmed";
@@ -132,6 +178,20 @@ export async function POST(req: Request) {
 
     if (!msg) {
       return NextResponse.json({ error: "Scheduled message not found" }, { status: 404 });
+    }
+
+    const qstashSig = req.headers.get("upstash-signature");
+    const hasSigningKeys = Boolean(
+      process.env.QSTASH_CURRENT_SIGNING_KEY || process.env.QSTASH_NEXT_SIGNING_KEY
+    );
+    const qstashAuthorized = verifyQStashSignature(qstashSig);
+    if (!qstashAuthorized) {
+      const { tenant: sessionTenant, isGuest } = await getActiveTenant();
+      if (hasSigningKeys || isGuest || sessionTenant.id !== msg.tenant_id) {
+        if (isGuest || sessionTenant.id !== msg.tenant_id) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+      }
     }
 
     // Idempotency guard

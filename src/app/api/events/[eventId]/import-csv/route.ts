@@ -43,7 +43,15 @@ export async function POST(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const { tenant } = await getActiveTenant(event.tenant_id);
+    const { tenant: sessionTenant, isGuest } = await getActiveTenant();
+    if (isGuest) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (sessionTenant.id !== event.tenant_id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const tenant = sessionTenant;
 
     // MODE A: Reconcile post-webinar Zoom / Google Meet Attendance CSV
     if (mode === "attendance_reconcile") {

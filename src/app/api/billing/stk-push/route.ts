@@ -121,7 +121,8 @@ export async function POST(req: Request) {
             mpesa_receipt: mpesaReceipt,
             sender_mode: senderMode === "own_waba" ? "own_waba" : "shared_showup",
           })
-          .eq("id", eventId);
+          .eq("id", eventId)
+          .eq("tenant_id", tenant.id);
       }
     } else {
       const db = readLocalDb();
@@ -136,7 +137,9 @@ export async function POST(req: Request) {
       targetTenant.billing_cycle_end = nextCycle;
 
       if (eventId) {
-        const evIdx = db.events.findIndex((e) => e.id === eventId);
+        const evIdx = db.events.findIndex(
+          (e) => e.id === eventId && e.tenant_id === tenant.id
+        );
         if (evIdx >= 0) {
           db.events[evIdx].is_paid = true;
           db.events[evIdx].paid_pass_tier = resolvedTier;

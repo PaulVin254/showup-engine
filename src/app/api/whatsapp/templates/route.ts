@@ -13,7 +13,13 @@ import { SequenceStage, ShowUpTemplate } from "@/lib/types";
 
 export async function GET() {
   try {
-    const { tenant } = await getActiveTenant();
+    const { tenant, isGuest } = await getActiveTenant();
+    if (isGuest) {
+      return NextResponse.json(
+        { error: "Sign in to submit message templates." },
+        { status: 401 }
+      );
+    }
     const supabaseReady = await checkSupabaseMigrationStatus();
 
     // If tenant has a live WABA token, sync status from Meta Graph API
@@ -107,7 +113,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const { tenant } = await getActiveTenant();
+    const { tenant, isGuest } = await getActiveTenant();
+    if (isGuest) {
+      return NextResponse.json(
+        { error: "Sign in to submit message templates." },
+        { status: 401 }
+      );
+    }
     const supabaseReady = await checkSupabaseMigrationStatus();
 
     const cleanName = String(name)

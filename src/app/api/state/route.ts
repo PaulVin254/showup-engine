@@ -3,6 +3,7 @@ import { seedSystemTemplatesForTenant } from "@/lib/default-templates";
 import {
   getActiveTenant,
   readLocalDb,
+  sanitizeTenantForClient,
   supabase,
 } from "@/lib/store";
 
@@ -16,7 +17,7 @@ export async function GET() {
       return NextResponse.json({
         supabaseReady,
         isGuest: true,
-        tenant,
+        tenant: sanitizeTenantForClient(tenant),
         events: [],
         templates: seedSystemTemplatesForTenant("guest"),
         registrants: [],
@@ -60,7 +61,7 @@ export async function GET() {
       return NextResponse.json({
         supabaseReady: true,
         isGuest: false,
-        tenant,
+        tenant: sanitizeTenantForClient(tenant),
         events: eventsRes.data || [],
         templates:
           templatesRes.data && templatesRes.data.length > 0
@@ -79,7 +80,7 @@ export async function GET() {
     return NextResponse.json({
       supabaseReady,
       isGuest: false,
-      tenant,
+      tenant: sanitizeTenantForClient(tenant),
       events: db.events.filter((e) => e.tenant_id === tenant.id),
       templates: db.templates.filter((t) => t.tenant_id === tenant.id),
       registrants: db.registrants.filter((r) => r.tenant_id === tenant.id),

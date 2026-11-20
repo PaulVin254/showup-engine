@@ -8,6 +8,7 @@ import {
   findOrCreateTenantByPhone,
   getActiveTenant,
   readLocalDb,
+  sanitizeTenantForClient,
   setTenantSessionCookie,
   supabase,
   writeLocalDb,
@@ -109,6 +110,9 @@ export async function POST(req: Request) {
 
     if (supabaseReady && supabase) {
       if (eventId) {
+        if (isGuest) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
         const { data, error } = await supabase
           .from("showup_events")
           .update({
@@ -119,14 +123,16 @@ export async function POST(req: Request) {
             join_url: newEvent.join_url,
           })
           .eq("id", eventId)
+          .eq("tenant_id", tenant.id)
           .select("*")
           .single();
         if (!error && data) {
           return withTenantCookie(
-            NextResponse.json({ event: data, tenant }),
+            NextResponse.json({ event: data, tenant: sanitizeTenantForClient(tenant) }),
             tenant.id
           );
         }
+        return NextResponse.json({ error: "Event not found" }, { status: 404 });
       }
 
       // Try inserting full event payload
@@ -138,7 +144,7 @@ export async function POST(req: Request) {
 
       if (!error && data) {
         return withTenantCookie(
-          NextResponse.json({ event: data, tenant }),
+          NextResponse.json({ event: data, tenant: sanitizeTenantForClient(tenant) }),
           tenant.id
         );
       }
@@ -160,7 +166,7 @@ export async function POST(req: Request) {
                 is_paid: Boolean(isPaid),
                 sender_mode: senderMode,
               },
-              tenant,
+              tenant: sanitizeTenantForClient(tenant),
             }),
             tenant.id
           );
@@ -170,14 +176,19 @@ export async function POST(req: Request) {
 
       if (error) throw new Error(error.message);
       return withTenantCookie(
-        NextResponse.json({ event: data, tenant }),
+        NextResponse.json({ event: data, tenant: sanitizeTenantForClient(tenant) }),
         tenant.id
       );
     }
 
     const db = readLocalDb();
     if (eventId) {
-      const existingIdx = db.events.findIndex((e) => e.id === eventId);
+      if (isGuest) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const existingIdx = db.events.findIndex(
+        (e) => e.id === eventId && e.tenant_id === tenant.id
+      );
       if (existingIdx >= 0) {
         db.events[existingIdx] = {
           ...db.events[existingIdx],
@@ -190,16 +201,20 @@ export async function POST(req: Request) {
         };
         writeLocalDb(db);
         return withTenantCookie(
-          NextResponse.json({ event: db.events[existingIdx], tenant }),
+          NextResponse.json({
+            event: db.events[existingIdx],
+            tenant: sanitizeTenantForClient(tenant),
+          }),
           tenant.id
         );
       }
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
     db.events.unshift(newEvent);
     writeLocalDb(db);
 
     return withTenantCookie(
-      NextResponse.json({ event: newEvent, tenant }),
+      NextResponse.json({ event: newEvent, tenant: sanitizeTenantForClient(tenant) }),
       tenant.id
     );
   } catch (err: unknown) {
@@ -217,7 +232,10 @@ export async function DELETE(req: Request) {
     const cleanup = url.searchParams.get("cleanup");
     const keepId = url.searchParams.get("keepId");
 
-    const { tenant } = await getActiveTenant();
+    const { tenant, isGuest } = await getActiveTenant();
+    if (isGuest) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const supabaseReady = await checkSupabaseMigrationStatus();
 
     // Mode A: Clean up empty test events
@@ -288,6 +306,17 @@ export async function DELETE(req: Request) {
     }
 
     if (supabaseReady && supabase) {
+      const { data: ownedEvent } = await supabase
+        .from("showup_events")
+        .select("id")
+        .eq("id", eventId)
+        .eq("tenant_id", tenant.id)
+        .maybeSingle();
+
+      if (!ownedEvent) {
+        return NextResponse.json({ error: "Event not found" }, { status: 404 });
+      }
+
       await supabase
         .from("showup_scheduled_messages")
         .delete()
@@ -310,6 +339,12 @@ export async function DELETE(req: Request) {
     }
 
     const db = readLocalDb();
+    const ownedLocal = db.events.some(
+      (e) => e.id === eventId && e.tenant_id === tenant.id
+    );
+    if (!ownedLocal) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
     db.events = db.events.filter((e) => e.id !== eventId);
     db.registrants = db.registrants.filter((r) => r.event_id !== eventId);
     db.scheduled_messages = db.scheduled_messages.filter(

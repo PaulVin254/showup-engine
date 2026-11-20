@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { normalizeKenyanPhone } from "@/lib/phone";
 import {
@@ -11,6 +12,30 @@ import {
 
 const VERIFY_TOKEN =
   process.env.META_WEBHOOK_VERIFY_TOKEN || "showup_secret_verify_token_2026";
+
+function verifyMetaWebhookRequest(req: Request, rawBody: string): boolean {
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appSecret) return true;
+
+  const forwardSecret = req.headers.get("x-webhook-secret");
+  if (forwardSecret && forwardSecret === VERIFY_TOKEN) {
+    return true;
+  }
+
+  const signature = req.headers.get("x-hub-signature-256");
+  if (!signature || !signature.startsWith("sha256=")) {
+    return false;
+  }
+
+  const expected = `sha256=${crypto
+    .createHmac("sha256", appSecret)
+    .update(rawBody, "utf8")
+    .digest("hex")}`;
+
+  const a = Buffer.from(signature, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 /**
  * Meta Webhook Verification Challenge (GET /api/webhooks/meta)
@@ -40,7 +65,11 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
-    const rawJson = await req.json();
+    const rawBody = await req.text();
+    if (!verifyMetaWebhookRequest(req, rawBody)) {
+      return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
+    }
+    const rawJson = JSON.parse(rawBody);
     // Unwrap raw Meta format or n8n wrapped format ($json.body)
     const payload = rawJson?.entry ? rawJson : rawJson?.body || rawJson;
     const supabaseReady = await checkSupabaseMigrationStatus();

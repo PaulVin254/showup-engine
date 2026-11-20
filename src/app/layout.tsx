@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
-import { NavigationLogger } from "@/components/NavigationLogger";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -23,7 +22,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-screen bg-canvas text-slate-100 font-sans antialiased">
-        <NavigationLogger />
         {children}
       </body>
     </html>

@@ -12,9 +12,8 @@ import {
 } from "@/lib/rate-limiter";
 import {
   clearTenantSessionCookie,
-  DEFAULT_TENANT_ID,
   findOrCreateTenantByPhone,
-  readLocalDb,
+  sanitizeTenantForClient,
   setTenantSessionCookie,
   supabase,
 } from "@/lib/store";
@@ -68,28 +67,6 @@ export async function POST(req: Request) {
         message: "Signed out of host workspace.",
       });
       return clearTenantSessionCookie(res);
-    }
-
-    // Action 2: Load Sample Demo Room (for testing / previewing)
-    if (action === "load_demo") {
-      const db = readLocalDb();
-      const firstTenant = db.tenants[0];
-      if (supabase) {
-        const { data: existing } = await supabase
-          .from("showup_tenants")
-          .select("id")
-          .eq("id", DEFAULT_TENANT_ID)
-          .maybeSingle();
-        if (!existing && firstTenant) {
-          await supabase.from("showup_tenants").insert(firstTenant);
-        }
-      }
-      const res = NextResponse.json({
-        success: true,
-        tenantId: DEFAULT_TENANT_ID,
-        message: "Loaded sample demo workspace.",
-      });
-      return setTenantSessionCookie(res, DEFAULT_TENANT_ID);
     }
 
     const phoneE164 = normalizeKenyanPhone(String(phone || ""));
@@ -186,15 +163,10 @@ export async function POST(req: Request) {
         );
       }
 
-      const allowDevHint =
-        Boolean(sendRes.simulated) && process.env.NODE_ENV !== "production";
-
       return NextResponse.json({
         success: true,
         phoneE164,
-        simulated: Boolean(sendRes.simulated),
         resendCooldownSeconds: 60,
-        devHint: allowDevHint ? String(otpCode) : undefined,
         message: `We sent a 6-digit login code to your WhatsApp (+${phoneE164}).`,
       });
     }
@@ -273,7 +245,7 @@ export async function POST(req: Request) {
       const tenant = await findOrCreateTenantByPhone({ phoneE164 });
       const res = NextResponse.json({
         success: true,
-        tenant,
+        tenant: sanitizeTenantForClient(tenant),
         message: `Welcome back! Loaded workspace for +${phoneE164}.`,
       });
 

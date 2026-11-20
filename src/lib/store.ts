@@ -101,6 +101,13 @@ export function clearTenantSessionCookie(res: NextResponse): NextResponse {
   return res;
 }
 
+export function sanitizeTenantForClient(tenant: ShowUpTenant): ShowUpTenant {
+  return {
+    ...tenant,
+    access_token: null,
+  };
+}
+
 export function getCookieTenantId(): string | null {
   try {
     const cookieStore = cookies();

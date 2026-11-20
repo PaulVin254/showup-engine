@@ -32,7 +32,6 @@ import { SettingsView } from "@/components/dashboard/SettingsView";
 import { BrandWordmark } from "@/components/BrandMark";
 import { Button, EASE_OUT_FAST, SPRING_SNAPPY, ToastItem, ToastStack } from "@/components/ui/kit";
 
-const DEV_MODE_KEY = "showup_dev_mode";
 const LAST_EVENT_KEY = "showup_last_selected_event_id";
 
 export default function DashboardPage() {
@@ -40,7 +39,6 @@ export default function DashboardPage() {
   const [view, setView] = useState<"events" | "settings">("events");
 
   const [loading, setLoading] = useState(true);
-  const [supabaseReady, setSupabaseReady] = useState(false);
   const [tenant, setTenant] = useState<ShowUpTenant | null>(null);
   const [events, setEvents] = useState<ShowUpEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState("");
@@ -63,7 +61,6 @@ export default function DashboardPage() {
   const [hostAuthOpen, setHostAuthOpen] = useState(false);
   const [registrantsOpen, setRegistrantsOpen] = useState(false);
   const [roiOpen, setRoiOpen] = useState(false);
-  const [devMode, setDevMode] = useState(false);
 
   // Async action state
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -84,7 +81,6 @@ export default function DashboardPage() {
     try {
       const res = await fetch("/api/state");
       const data = await res.json();
-      setSupabaseReady(Boolean(data.supabaseReady));
       setTenant(data.tenant || null);
       const loaded: ShowUpEvent[] = data.events || [];
       setEvents(loaded);
@@ -124,7 +120,6 @@ export default function DashboardPage() {
   }, [loadWorkspace]);
 
   useEffect(() => {
-    setDevMode(localStorage.getItem(DEV_MODE_KEY) === "1");
     const params = new URLSearchParams(window.location.search);
     if (params.get("setup") === "1") {
       setPrefillTitle(params.get("title") || "");
@@ -134,11 +129,6 @@ export default function DashboardPage() {
       setWizardOpen(true);
     }
   }, []);
-
-  const updateDevMode = (v: boolean) => {
-    setDevMode(v);
-    localStorage.setItem(DEV_MODE_KEY, v ? "1" : "0");
-  };
 
   const activeEvent = events.find((e) => e.id === selectedEventId) || events[0] || null;
   const lifecycle = deriveLifecycle(activeEvent, now);
@@ -512,9 +502,6 @@ export default function DashboardPage() {
                 payments={payments}
                 templates={templates}
                 originUrl={originUrl}
-                supabaseReady={supabaseReady}
-                devMode={devMode}
-                onDevModeChange={updateDevMode}
                 onConnect={() => setEmbeddedOpen(true)}
                 onReload={loadWorkspace}
                 onToast={showToast}
@@ -626,7 +613,6 @@ export default function DashboardPage() {
         tenant={tenant}
         defaultConfigId={metaConfigId}
         defaultAppId={metaAppId}
-        devMode={devMode}
         onConnected={(updated) => {
           setTenant(updated);
           showToast(

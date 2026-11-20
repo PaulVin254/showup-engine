@@ -1,21 +1,18 @@
 "use client";
 
 import React, { useState } from "react";
-import { Copy, RefreshCw } from "lucide-react";
+import { Copy } from "lucide-react";
 import { SequenceStage, ShowUpPayment, ShowUpTemplate, ShowUpTenant } from "@/lib/types";
 import { renderTemplatePreview } from "@/lib/default-templates";
 import { fmtEat } from "@/lib/lifecycle";
 import { cn } from "@/lib/cn";
-import { Button, Kbd, StatusPill, inputCls, labelCls } from "@/components/ui/kit";
+import { Button, StatusPill, inputCls, labelCls } from "@/components/ui/kit";
 
 interface SettingsViewProps {
   tenant: ShowUpTenant;
   payments: ShowUpPayment[];
   templates: ShowUpTemplate[];
   originUrl: string;
-  supabaseReady: boolean;
-  devMode: boolean;
-  onDevModeChange: (v: boolean) => void;
   onConnect: () => void;
   onReload: () => Promise<void>;
   onToast: (msg: string, tone?: "success" | "error" | "info") => void;
@@ -46,9 +43,6 @@ export function SettingsView({
   payments,
   templates,
   originUrl,
-  supabaseReady,
-  devMode,
-  onDevModeChange,
   onConnect,
   onReload,
   onToast,
@@ -202,42 +196,6 @@ export function SettingsView({
             </Button>
           </div>
         </form>
-      </Row>
-
-      <Row
-        title="Developer mode"
-        description={
-          <>
-            Shows Meta diagnostics in the connection dialog. You can also press <Kbd>Ctrl</Kbd>{" "}
-            <Kbd>Shift</Kbd> <Kbd>D</Kbd> inside it.
-          </>
-        }
-      >
-        <div className="flex items-center justify-between gap-4">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={devMode}
-            onClick={() => onDevModeChange(!devMode)}
-            className={cn(
-              "relative w-9 h-5 rounded-full transition border",
-              devMode ? "bg-[#1877f2] border-[#1877f2]" : "bg-white/[0.06] border-white/[0.1]"
-            )}
-          >
-            <span
-              className={cn(
-                "absolute top-[2px] left-[2px] w-3.5 h-3.5 rounded-full bg-white transition-transform",
-                devMode && "translate-x-4"
-              )}
-            />
-          </button>
-          <div className="flex items-center gap-3 text-[12px] text-slate-500">
-            <span>{supabaseReady ? "Supabase connected" : "Local JSON store"}</span>
-            <Button size="sm" onClick={() => onReload()} icon={<RefreshCw className="w-3 h-3" />}>
-              Refresh
-            </Button>
-          </div>
-        </div>
       </Row>
     </div>
   );
