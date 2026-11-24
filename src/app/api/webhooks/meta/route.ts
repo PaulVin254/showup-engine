@@ -87,10 +87,33 @@ export async function POST(req: Request) {
           const nowIso = new Date().toISOString();
 
           if (wamid && ["sent", "delivered", "read", "failed"].includes(status)) {
+            const firstErr = Array.isArray(statusObj.errors) ? statusObj.errors[0] : null;
+            const errorDetail = firstErr
+              ? [
+                  firstErr.code ? `(#${firstErr.code})` : null,
+                  firstErr.title || firstErr.message || null,
+                  firstErr.error_data?.details || null,
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              : null;
+
+            if (status === "failed") {
+              console.error("[meta-webhook] Message delivery failed:", {
+                wamid,
+                recipient: statusObj.recipient_id,
+                phoneNumberId: value?.metadata?.phone_number_id,
+                error: errorDetail || statusObj.errors || "Unknown Meta delivery failure",
+              });
+            }
+
             if (supabaseReady && supabase) {
               const updateFields: Record<string, string> = { status };
               if (status === "delivered") updateFields.delivered_at = nowIso;
               if (status === "read") updateFields.read_at = nowIso;
+              if (status === "failed" && errorDetail) {
+                updateFields.error_message = errorDetail;
+              }
               await supabase
                 .from("showup_scheduled_messages")
                 .update(updateFields)
@@ -101,6 +124,9 @@ export async function POST(req: Request) {
                 target.status = status;
                 if (status === "delivered") target.delivered_at = nowIso;
                 if (status === "read") target.read_at = nowIso;
+                if (status === "failed" && errorDetail) {
+                  target.error_message = errorDetail;
+                }
                 dirty = true;
               }
             }
