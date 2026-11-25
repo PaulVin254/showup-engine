@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Trash2, Upload } from "lucide-react";
 import { SenderMode, ShowUpEvent, ShowUpRegistrant, ShowUpTenant } from "@/lib/types";
-import { normalizeKenyanPhone, formatPhoneDisplay } from "@/lib/phone";
+import { normalizeKenyanPhone } from "@/lib/phone";
 import {
   PIPELINE_STAGES,
   detectMeetingPlatform,
@@ -108,15 +108,11 @@ export function EventSetupWizard({
   const [senderMode, setSenderMode] = useState<SenderMode>(
     initialEvent?.sender_mode || "shared_showup"
   );
-  const [passTier, setPassTier] = useState<"event_pass" | "event_scale">("event_pass");
-  const [mpesaPhone, setMpesaPhone] = useState(initialPhone || tenant.phone_e164 || "");
   const [paying, setPaying] = useState(false);
 
   const showContactPhoneField = !tenant.phone_e164;
   const hostNorm = normalizeKenyanPhone(hostPhone);
-  const mpesaNorm = normalizeKenyanPhone(mpesaPhone);
   const leadCount = eventRegistrants.length;
-  const priceKes = passTier === "event_scale" ? 3000 : 1500;
 
   const copyText = (key: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -154,7 +150,6 @@ export function EventSetupWizard({
         senderMode,
       });
       setCurrentEvent(data.event);
-      if (!mpesaPhone) setMpesaPhone(hostPhone.trim());
       await onEventSaved(data.event);
       goStep(2);
     } catch (err) {
@@ -199,21 +194,19 @@ export function EventSetupWizard({
   const payAndLaunch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentEvent) return;
-    if (!mpesaNorm) {
-      onToast("Enter a valid M-Pesa number");
-      return;
-    }
     setPaying(true);
     try {
       const data = await postJson("/api/billing/stk-push", {
-        planTier: passTier,
-        phone: mpesaPhone,
+        planTier: "pilot",
         eventId: currentEvent.id,
         senderMode,
       });
-      await onLaunched(currentEvent.id, data.message || "STK push sent. Check your phone.");
+      await onLaunched(
+        currentEvent.id,
+        data.message || "Webinar launched (Free beta) — your 5-stage WhatsApp reminders are now active."
+      );
     } catch (err) {
-      onToast(err instanceof Error ? err.message : "Payment failed");
+      onToast(err instanceof Error ? err.message : "Could not launch webinar");
     } finally {
       setPaying(false);
     }
@@ -279,7 +272,7 @@ export function EventSetupWizard({
           Back
         </Button>
         <Button type="submit" form="wiz-step3" variant="success" loading={paying}>
-          Pay KES {priceKes.toLocaleString("en-KE")} via M-Pesa
+          Launch webinar (Free beta)
         </Button>
       </>
     );
@@ -705,54 +698,21 @@ export function EventSetupWizard({
               ))}
             </div>
 
-            <div className="rounded-xl border border-neutral-200 bg-[#fafafa] p-3.5 flex flex-col gap-3">
+            <div className="rounded-xl border border-neutral-200 bg-[#fafafa] p-3.5 flex flex-col gap-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-[12.5px] text-neutral-600">
-                  <span className="font-mono tabular-nums font-semibold text-[#111111]">{leadCount}</span> leads
-                  queued.{" "}
-                  <span className="text-neutral-500">Welcome messages send on payment.</span>
+                  <span className="font-mono tabular-nums font-semibold text-[#111111]">
+                    {leadCount}
+                  </span>{" "}
+                  leads queued.
                 </div>
-                <div className="inline-flex p-0.5 rounded-full bg-white border border-neutral-200 text-[11.5px] shrink-0">
-                  {(
-                    [
-                      ["event_pass", "200 · 1,500"],
-                      ["event_scale", "500 · 3,000"],
-                    ] as const
-                  ).map(([id, label]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setPassTier(id)}
-                      className={cn(
-                        "h-6 px-2.5 rounded-full font-mono tabular-nums transition",
-                        passTier === id ? "bg-[#111111] text-white" : "text-neutral-500"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className={labelCls}>M-Pesa number (STK push)</label>
-                <input
-                  required
-                  type="tel"
-                  placeholder="0712 345 678"
-                  value={mpesaPhone}
-                  onChange={(e) => setMpesaPhone(e.target.value)}
-                  className={cn(
-                    inputCls,
-                    "font-mono tabular-nums",
-                    mpesaPhone.length > 3 && !mpesaNorm && "border-red-500"
-                  )}
-                />
-                <div className="mt-1 h-3.5 text-[10.5px] font-mono tabular-nums text-neutral-500">
-                  {mpesaNorm ? `Prompt goes to ${formatPhoneDisplay(mpesaNorm)}` : ""}
-                </div>
+                <StatusPill tone="emerald" dot={false}>
+                  Free beta
+                </StatusPill>
               </div>
               <p className="text-[11.5px] text-neutral-500">
-                Full refund if fewer than 30% of registrants show up.
+                Free during beta (up to {tenant.registrant_limit} registrants) · M-Pesa billing
+                coming soon.
               </p>
             </div>
           </motion.form>

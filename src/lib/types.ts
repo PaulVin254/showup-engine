@@ -75,7 +75,7 @@ export interface ShowUpEvent {
   status: "upcoming" | "live" | "completed" | "cancelled";
   is_paid?: boolean;
   sender_mode?: SenderMode;
-  paid_pass_tier?: "event_pass" | "event_scale" | "starter" | "pro";
+  paid_pass_tier?: "event_pass" | "event_scale" | "starter" | "pro" | "pilot";
   mpesa_receipt?: string | null;
   created_at: string;
 }

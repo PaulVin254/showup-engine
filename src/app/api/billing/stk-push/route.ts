@@ -11,6 +11,8 @@ import {
 } from "@/lib/store";
 import { ShowUpPayment } from "@/lib/types";
 
+const MPESA_LIVE = process.env.MPESA_DARAJA_ENABLED === "true";
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -20,6 +22,58 @@ export async function POST(req: Request) {
       eventId,
       senderMode = "shared_showup",
     } = body;
+
+    const { tenant, isGuest } = await getActiveTenant();
+    if (isGuest) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const supabaseReady = await checkSupabaseMigrationStatus();
+    const effectiveSenderMode = senderMode === "own_waba" ? "own_waba" : "shared_showup";
+
+    if (!MPESA_LIVE) {
+      if (eventId) {
+        if (supabaseReady && supabase) {
+          const { error: evErr } = await supabase
+            .from("showup_events")
+            .update({
+              is_paid: true,
+              paid_pass_tier: "pilot",
+              mpesa_receipt: "BETA-FREE",
+              sender_mode: effectiveSenderMode,
+            })
+            .eq("id", eventId)
+            .eq("tenant_id", tenant.id);
+
+          if (evErr && evErr.message?.includes("column")) {
+            await supabase
+              .from("showup_events")
+              .update({ sender_mode: effectiveSenderMode })
+              .eq("id", eventId)
+              .eq("tenant_id", tenant.id);
+          }
+        } else {
+          const db = readLocalDb();
+          const evIdx = db.events.findIndex(
+            (e) => e.id === eventId && e.tenant_id === tenant.id
+          );
+          if (evIdx >= 0) {
+            db.events[evIdx].is_paid = true;
+            db.events[evIdx].paid_pass_tier = "pilot";
+            db.events[evIdx].mpesa_receipt = "BETA-FREE";
+            db.events[evIdx].sender_mode = effectiveSenderMode;
+            writeLocalDb(db);
+          }
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        betaFree: true,
+        newPlanTier: tenant.plan_tier,
+        newRegistrantLimit: tenant.registrant_limit,
+        message: "Webinar launched (Free beta) — your 5-stage WhatsApp reminders are now active!",
+      });
+    }
 
     const phoneE164 = normalizeKenyanPhone(String(phone || ""));
     if (!phoneE164) {
@@ -58,12 +112,6 @@ export async function POST(req: Request) {
     const resolvedTier: "event_pass" | "event_scale" | "starter" | "pro" =
       planTier in tierPricing ? planTier : "event_pass";
     const { amountKes, limit: newLimit, label } = tierPricing[resolvedTier];
-
-    const { tenant, isGuest } = await getActiveTenant();
-    if (isGuest) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const supabaseReady = await checkSupabaseMigrationStatus();
 
     const checkoutRequestId = `ws_CO_${Date.now()}_${Math.random()
       .toString(36)
