@@ -202,3 +202,19 @@ export async function checkGlobalDailyCap(): Promise<{ allowed: boolean }> {
   });
   return { allowed: res.allowed };
 }
+
+/**
+ * 4. Public Registration IP Rate Limit: Max 10 attempts per hour per IP.
+ */
+export async function checkRegisterIpRateLimit(
+  clientIp: string
+): Promise<{ allowed: boolean }> {
+  const cleanIp = clientIp.replace(/[^a-zA-Z0-9.:_-]/g, "").slice(0, 45);
+  const key = `reg_ip_limit:${cleanIp}`;
+  const res = await checkAndIncrementLimit({
+    key,
+    maxCount: 10,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  });
+  return { allowed: res.allowed };
+}

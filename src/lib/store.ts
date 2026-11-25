@@ -605,3 +605,122 @@ export async function updateTenantWabaConnection(params: {
   return target;
 }
 
+export async function findOtherTenantByPhoneNumberId(
+  phoneNumberId: string,
+  excludeTenantId: string
+): Promise<ShowUpTenant | null> {
+  if (!phoneNumberId) return null;
+  const supabaseReady = await checkSupabaseMigrationStatus();
+
+  if (supabaseReady && supabase) {
+    const { data } = await supabase
+      .from("showup_tenants")
+      .select("*")
+      .eq("phone_number_id", phoneNumberId)
+      .eq("waba_status", "connected")
+      .neq("id", excludeTenantId)
+      .neq("id", DEFAULT_TENANT_ID)
+      .limit(1)
+      .maybeSingle();
+    return (data as ShowUpTenant) || null;
+  }
+
+  const db = readLocalDb();
+  return (
+    db.tenants.find(
+      (t) =>
+        t.phone_number_id === phoneNumberId &&
+        t.waba_status === "connected" &&
+        t.id !== excludeTenantId &&
+        t.id !== DEFAULT_TENANT_ID
+    ) || null
+  );
+}
+
+export async function updateTenantProfile(
+  tenantId: string,
+  updates: { business_name?: string; phone_e164?: string }
+): Promise<ShowUpTenant | null> {
+  const cleanUpdates: Record<string, string> = {};
+  if (updates.business_name !== undefined) {
+    cleanUpdates.business_name = updates.business_name;
+  }
+  if (updates.phone_e164 !== undefined) {
+    cleanUpdates.phone_e164 = updates.phone_e164;
+  }
+
+  const supabaseReady = await checkSupabaseMigrationStatus();
+  if (supabaseReady && supabase) {
+    const { data, error } = await supabase
+      .from("showup_tenants")
+      .update(cleanUpdates)
+      .eq("id", tenantId)
+      .select("*")
+      .maybeSingle();
+    if (!error && data) return data as ShowUpTenant;
+  }
+
+  const db = readLocalDb();
+  const target = db.tenants.find((t) => t.id === tenantId);
+  if (!target) return null;
+  if (updates.business_name !== undefined) {
+    target.business_name = updates.business_name;
+  }
+  if (updates.phone_e164 !== undefined) {
+    target.phone_e164 = updates.phone_e164;
+  }
+  writeLocalDb(db);
+  return target;
+}
+
+export async function disconnectTenantWaba(
+  tenantId: string
+): Promise<ShowUpTenant | null> {
+  const supabaseReady = await checkSupabaseMigrationStatus();
+
+  if (supabaseReady && supabase) {
+    const { data, error } = await supabase
+      .from("showup_tenants")
+      .update({
+        waba_id: null,
+        phone_number_id: null,
+        display_phone_number: null,
+        access_token: null,
+        waba_status: "disconnected",
+        connected_at: null,
+      })
+      .eq("id", tenantId)
+      .select("*")
+      .maybeSingle();
+
+    try {
+      await supabase
+        .from("showup_events")
+        .update({ sender_mode: "shared_showup" })
+        .eq("tenant_id", tenantId)
+        .eq("sender_mode", "own_waba");
+    } catch {
+      // Ignore if sender_mode column is absent on legacy schema
+    }
+
+    if (!error && data) return data as ShowUpTenant;
+  }
+
+  const db = readLocalDb();
+  const target = db.tenants.find((t) => t.id === tenantId);
+  if (!target) return null;
+  target.waba_id = null;
+  target.phone_number_id = null;
+  target.display_phone_number = null;
+  target.access_token = null;
+  target.waba_status = "disconnected";
+  target.connected_at = null;
+  for (const ev of db.events) {
+    if (ev.tenant_id === tenantId && ev.sender_mode === "own_waba") {
+      ev.sender_mode = "shared_showup";
+    }
+  }
+  writeLocalDb(db);
+  return target;
+}
+

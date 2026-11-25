@@ -48,9 +48,17 @@ export async function POST(req: Request) {
     }
     const supabaseReady = await checkSupabaseMigrationStatus();
 
-    const normalizedHostPhone = hostPhone
-      ? normalizeKenyanPhone(String(hostPhone))
-      : null;
+    const rawHostPhone = hostPhone ? String(hostPhone).trim() : "";
+    let normalizedHostPhone: string | null = null;
+    if (rawHostPhone) {
+      normalizedHostPhone = normalizeKenyanPhone(rawHostPhone);
+      if (!normalizedHostPhone) {
+        return NextResponse.json(
+          { error: "Enter a valid Kenyan phone number (e.g. 0712 345 678) or leave it blank." },
+          { status: 400 }
+        );
+      }
+    }
 
     if (normalizedHostPhone && !tenant.phone_e164) {
       await updateTenantContactPhone(tenant.id, normalizedHostPhone);

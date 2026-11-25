@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Clock, Copy, RefreshCw } from "lucide-react";
 import { SequenceStage, ShowUpPayment, ShowUpTemplate, ShowUpTenant } from "@/lib/types";
+import { normalizeKenyanPhone } from "@/lib/phone";
 import {
   buildExampleValuesForBody,
   countTemplatePlaceholders,
@@ -86,11 +87,81 @@ export function SettingsView({
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
   const [justSubmitted, setJustSubmitted] = useState(false);
 
+  const [businessName, setBusinessName] = useState(tenant.business_name);
+  const [contactPhone, setContactPhone] = useState(tenant.phone_e164 || "");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  useEffect(() => {
+    setBusinessName(tenant.business_name);
+    setContactPhone(tenant.phone_e164 || "");
+  }, [tenant.id, tenant.business_name, tenant.phone_e164]);
+
   const connected = tenant.waba_status === "connected";
+  const contactPhoneNorm = contactPhone.trim()
+    ? normalizeKenyanPhone(contactPhone.trim())
+    : null;
+  const contactPhoneInvalid = Boolean(contactPhone.trim()) && !contactPhoneNorm;
   const hasPendingTemplates = templates.some((t) => t.status === "PENDING") || justSubmitted;
   const approvedCount = templates.filter((t) => t.status === "APPROVED").length;
   const previewExampleValues = buildExampleValuesForBody(body);
   const placeholderCount = countTemplatePlaceholders(body);
+
+  const saveWorkspaceProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!businessName.trim()) {
+      onToast("Business / host name is required", "error");
+      return;
+    }
+    if (contactPhoneInvalid) {
+      onToast("Enter a valid Kenyan WhatsApp / M-Pesa phone number or leave it blank", "error");
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const res = await fetch("/api/workspace", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessName: businessName.trim(),
+          phone: contactPhone.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not update workspace settings");
+      await onReload();
+      onToast("Workspace settings saved");
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Could not update workspace settings", "error");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleDisconnectWaba = async () => {
+    if (
+      !window.confirm(
+        "Disconnect this WhatsApp Business number? Scheduled reminders will fall back to the shared ShowUp number."
+      )
+    ) {
+      return;
+    }
+    setDisconnecting(true);
+    try {
+      const res = await fetch("/api/whatsapp/disconnect", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not disconnect WhatsApp Business");
+      await onReload();
+      onToast(data.message || "WhatsApp Business disconnected");
+    } catch (err) {
+      onToast(
+        err instanceof Error ? err.message : "Could not disconnect WhatsApp Business",
+        "error"
+      );
+    } finally {
+      setDisconnecting(false);
+    }
+  };
 
   const syncFromMeta = async () => {
     setSyncing(true);
@@ -163,6 +234,49 @@ export function SettingsView({
       </div>
 
       <Row
+        title="Workspace"
+        description="Your host name and optional contact or M-Pesa billing phone number."
+      >
+        <form onSubmit={saveWorkspaceProfile} className="flex flex-col gap-3">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Business / host name</label>
+              <input
+                required
+                maxLength={120}
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                placeholder="e.g. Nairobi Wealth & Academy"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Contact / M-Pesa phone (optional)</label>
+              <input
+                type="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="0712 345 678"
+                className={cn(
+                  inputCls,
+                  "font-mono tabular-nums",
+                  contactPhoneInvalid && "border-red-500"
+                )}
+              />
+              <div className="mt-1 h-3.5 text-[10.5px] font-mono tabular-nums text-neutral-500">
+                {contactPhoneNorm ? `-> +${contactPhoneNorm}` : ""}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button type="submit" variant="brand" loading={savingProfile}>
+              Save workspace
+            </Button>
+          </div>
+        </form>
+      </Row>
+
+      <Row
         title="Sender"
         description="Reminders go out from the shared ShowUp number until you connect your own WhatsApp Business number."
       >
@@ -175,7 +289,19 @@ export function SettingsView({
               {connected ? tenant.display_phone_number || tenant.phone_number_id : "ShowUp Verified"}
             </span>
           </div>
-          <Button onClick={onConnect}>{connected ? "Manage connection" : "Connect WhatsApp Business"}</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {connected && (
+              <Button
+                type="button"
+                variant="danger"
+                loading={disconnecting}
+                onClick={handleDisconnectWaba}
+              >
+                Disconnect
+              </Button>
+            )}
+            <Button onClick={onConnect}>{connected ? "Manage connection" : "Connect WhatsApp Business"}</Button>
+          </div>
         </div>
       </Row>
 

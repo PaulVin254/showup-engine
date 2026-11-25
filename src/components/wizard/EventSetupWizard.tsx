@@ -112,6 +112,7 @@ export function EventSetupWizard({
   const [mpesaPhone, setMpesaPhone] = useState(initialPhone || tenant.phone_e164 || "");
   const [paying, setPaying] = useState(false);
 
+  const showContactPhoneField = !tenant.phone_e164;
   const hostNorm = normalizeKenyanPhone(hostPhone);
   const mpesaNorm = normalizeKenyanPhone(mpesaPhone);
   const leadCount = eventRegistrants.length;
@@ -136,8 +137,8 @@ export function EventSetupWizard({
 
   const saveStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hostNorm) {
-      onToast("Enter a valid Kenyan WhatsApp number");
+    if (showContactPhoneField && hostPhone.trim() && !hostNorm) {
+      onToast("Enter a valid Kenyan phone number or leave it blank");
       return;
     }
     setSaving(true);
@@ -147,7 +148,7 @@ export function EventSetupWizard({
         eventId: currentEvent?.id,
         title: title.trim(),
         hostName: hostName.trim() || "ShowUp Host",
-        hostPhone: hostPhone.trim(),
+        hostPhone: showContactPhoneField && hostPhone.trim() ? hostPhone.trim() : undefined,
         startsAt: eatLocalToIso(startsAtLocal),
         joinUrl: finalJoinUrl,
         senderMode,
@@ -364,7 +365,7 @@ export function EventSetupWizard({
                 />
               </div>
             </div>
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className={cn("grid gap-3", showContactPhoneField && "sm:grid-cols-2")}>
               <div>
                 <label className={labelCls}>Starts (EAT)</label>
                 <input
@@ -375,24 +376,25 @@ export function EventSetupWizard({
                   className={cn(inputCls, "font-mono tabular-nums")}
                 />
               </div>
-              <div>
-                <label className={labelCls}>Your WhatsApp number</label>
-                <input
-                  required
-                  type="tel"
-                  placeholder="0712 345 678"
-                  value={hostPhone}
-                  onChange={(e) => setHostPhone(e.target.value)}
-                  className={cn(
-                    inputCls,
-                    "font-mono tabular-nums",
-                    hostPhone.length > 3 && !hostNorm && "border-red-500"
-                  )}
-                />
-                <div className="mt-1 h-3.5 text-[10.5px] font-mono tabular-nums text-neutral-500">
-                  {hostNorm ? `-> +${hostNorm}` : ""}
+              {showContactPhoneField && (
+                <div>
+                  <label className={labelCls}>Host contact / M-Pesa phone (optional)</label>
+                  <input
+                    type="tel"
+                    placeholder="0712 345 678"
+                    value={hostPhone}
+                    onChange={(e) => setHostPhone(e.target.value)}
+                    className={cn(
+                      inputCls,
+                      "font-mono tabular-nums",
+                      hostPhone.length > 3 && !hostNorm && "border-red-500"
+                    )}
+                  />
+                  <div className="mt-1 h-3.5 text-[10.5px] font-mono tabular-nums text-neutral-500">
+                    {hostNorm ? `-> +${hostNorm}` : ""}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">

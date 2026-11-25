@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { normalizeKenyanPhone } from "@/lib/phone";
 import {
+  DEFAULT_TENANT_ID,
   checkSupabaseMigrationStatus,
   readLocalDb,
   supabase,
@@ -79,6 +80,11 @@ export async function POST(req: Request) {
     for (const entry of payload?.entry || []) {
       for (const change of entry?.changes || []) {
         const value = change?.value;
+        const incomingPhoneNumberId = String(
+          value?.metadata?.phone_number_id || ""
+        ).trim();
+        const sharedPhoneNumberId =
+          process.env.SHOWUP_SHARED_PHONE_NUMBER_ID || "1017704028092663";
 
         // 1. Handle WhatsApp Status Updates (sent -> delivered -> read -> failed)
         for (const statusObj of value?.statuses || []) {
@@ -147,21 +153,87 @@ export async function POST(req: Request) {
             .toUpperCase();
 
           if (fromPhone) {
-            // STOP / UNSUBSCRIBE Opt-Out Handling
+            // STOP / UNSUBSCRIBE Opt-Out Handling scoped to the receiving sender / tenant
             if (textBody === "STOP" || textBody === "UNSUBSCRIBE") {
               if (supabaseReady && supabase) {
-                const { data: matchedRegs } = await supabase
-                  .from("showup_registrants")
-                  .select("id")
-                  .eq("phone_e164", fromPhone);
+                let ownWabaTenantId: string | null = null;
+                if (
+                  incomingPhoneNumberId &&
+                  incomingPhoneNumberId !== sharedPhoneNumberId
+                ) {
+                  const { data: matchedTenant } = await supabase
+                    .from("showup_tenants")
+                    .select("id")
+                    .eq("phone_number_id", incomingPhoneNumberId)
+                    .eq("waba_status", "connected")
+                    .neq("id", DEFAULT_TENANT_ID)
+                    .limit(1)
+                    .maybeSingle();
+                  if (matchedTenant?.id) {
+                    ownWabaTenantId = String(matchedTenant.id);
+                  }
+                }
 
-                await supabase
-                  .from("showup_registrants")
-                  .update({ opted_out: true })
-                  .eq("phone_e164", fromPhone);
+                let regIds: string[] = [];
 
-                if (matchedRegs && matchedRegs.length > 0) {
-                  const regIds = matchedRegs.map((r) => r.id);
+                if (ownWabaTenantId) {
+                  const { data: matchedRegs } = await supabase
+                    .from("showup_registrants")
+                    .select("id")
+                    .eq("phone_e164", fromPhone)
+                    .eq("tenant_id", ownWabaTenantId);
+
+                  regIds = (matchedRegs || []).map((r) => String(r.id));
+                  if (regIds.length > 0) {
+                    await supabase
+                      .from("showup_registrants")
+                      .update({ opted_out: true })
+                      .in("id", regIds);
+                  }
+                } else {
+                  let sharedEventIds: string[] = [];
+                  const { data: sharedEvents, error: evErr } = await supabase
+                    .from("showup_events")
+                    .select("id")
+                    .or("sender_mode.eq.shared_showup,sender_mode.is.null");
+
+                  if (!evErr && sharedEvents) {
+                    sharedEventIds = sharedEvents.map((e) => String(e.id));
+                  } else {
+                    const { data: ownWabaTenants } = await supabase
+                      .from("showup_tenants")
+                      .select("id")
+                      .eq("waba_status", "connected")
+                      .neq("id", DEFAULT_TENANT_ID);
+                    const ownIds = new Set(
+                      (ownWabaTenants || []).map((t) => String(t.id))
+                    );
+                    const { data: allEvents } = await supabase
+                      .from("showup_events")
+                      .select("id, tenant_id");
+                    sharedEventIds = (allEvents || [])
+                      .filter((e) => !ownIds.has(String(e.tenant_id)))
+                      .map((e) => String(e.id));
+                  }
+
+                  if (sharedEventIds.length > 0) {
+                    const { data: matchedRegs } = await supabase
+                      .from("showup_registrants")
+                      .select("id")
+                      .eq("phone_e164", fromPhone)
+                      .in("event_id", sharedEventIds);
+
+                    regIds = (matchedRegs || []).map((r) => String(r.id));
+                    if (regIds.length > 0) {
+                      await supabase
+                        .from("showup_registrants")
+                        .update({ opted_out: true })
+                        .in("id", regIds);
+                    }
+                  }
+                }
+
+                if (regIds.length > 0) {
                   await supabase
                     .from("showup_scheduled_messages")
                     .update({
@@ -172,14 +244,47 @@ export async function POST(req: Request) {
                     .eq("status", "scheduled");
                 }
               } else {
+                const matchedTenant =
+                  incomingPhoneNumberId &&
+                  incomingPhoneNumberId !== sharedPhoneNumberId
+                    ? db.tenants.find(
+                        (t) =>
+                          t.phone_number_id === incomingPhoneNumberId &&
+                          t.waba_status === "connected" &&
+                          t.id !== DEFAULT_TENANT_ID
+                      )
+                    : undefined;
+
                 const regIds = new Set<string>();
-                for (const r of db.registrants) {
-                  if (r.phone_e164 === fromPhone) {
-                    r.opted_out = true;
-                    regIds.add(r.id);
-                    dirty = true;
+                if (matchedTenant) {
+                  for (const r of db.registrants) {
+                    if (
+                      r.phone_e164 === fromPhone &&
+                      r.tenant_id === matchedTenant.id
+                    ) {
+                      r.opted_out = true;
+                      regIds.add(r.id);
+                      dirty = true;
+                    }
+                  }
+                } else {
+                  const sharedEventIds = new Set(
+                    db.events
+                      .filter((e) => e.sender_mode !== "own_waba")
+                      .map((e) => e.id)
+                  );
+                  for (const r of db.registrants) {
+                    if (
+                      r.phone_e164 === fromPhone &&
+                      sharedEventIds.has(r.event_id)
+                    ) {
+                      r.opted_out = true;
+                      regIds.add(r.id);
+                      dirty = true;
+                    }
                   }
                 }
+
                 for (const m of db.scheduled_messages) {
                   if (regIds.has(m.registrant_id) && m.status === "scheduled") {
                     m.status = "skipped";

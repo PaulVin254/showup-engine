@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { normalizeKenyanPhone } from "@/lib/phone";
+import { checkRegisterIpRateLimit } from "@/lib/rate-limiter";
 import { scheduleAndFireSequenceForRegistrant } from "@/lib/scheduler";
 import {
   checkSupabaseMigrationStatus,
@@ -24,13 +25,34 @@ export async function POST(
       phone,
       email = "",
       source = "hosted_page",
-      consentGiven = true,
+      consentGiven,
     } = body;
 
     if (!fullName || !phone) {
       return NextResponse.json(
         { error: "Full name and WhatsApp phone number are required." },
         { status: 400 }
+      );
+    }
+
+    if (consentGiven !== true) {
+      return NextResponse.json(
+        { error: "WhatsApp reminder consent is required to register." },
+        { status: 400 }
+      );
+    }
+
+    const clientIp =
+      req.headers.get("cf-connecting-ip") ||
+      req.headers.get("x-real-ip") ||
+      req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+      "127.0.0.1";
+
+    const ipCheck = await checkRegisterIpRateLimit(clientIp);
+    if (!ipCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many registration attempts from your network. Please try again later." },
+        { status: 429 }
       );
     }
 
@@ -64,6 +86,38 @@ export async function POST(
       return NextResponse.json({ error: "Webinar event not found." }, { status: 404 });
     }
 
+    // Per-event phone deduplication BEFORE quota check, DB write, and WhatsApp send
+    if (supabaseReady && supabase) {
+      const { data: existingReg } = await supabase
+        .from("showup_registrants")
+        .select("*")
+        .eq("event_id", event.id)
+        .eq("phone_e164", phoneE164)
+        .maybeSingle();
+
+      if (existingReg) {
+        return NextResponse.json({
+          success: true,
+          alreadyRegistered: true,
+          registrant: existingReg,
+          scheduledMessages: [],
+        });
+      }
+    } else {
+      const db = readLocalDb();
+      const existingReg = db.registrants.find(
+        (r) => r.event_id === event!.id && r.phone_e164 === phoneE164
+      );
+      if (existingReg) {
+        return NextResponse.json({
+          success: true,
+          alreadyRegistered: true,
+          registrant: existingReg,
+          scheduledMessages: [],
+        });
+      }
+    }
+
     const { tenant } = await getActiveTenant(event.tenant_id);
 
     // Check registrant limit on current plan
@@ -90,7 +144,7 @@ export async function POST(
       source: source as ShowUpRegistrant["source"],
       meta_lead_id: null,
       tracking_token: trackingToken,
-      consent_given: Boolean(consentGiven),
+      consent_given: true,
       opted_out: false,
       clicked_join_link: false,
       joined_at: null,
@@ -102,11 +156,30 @@ export async function POST(
     if (supabaseReady && supabase) {
       const { data: savedReg, error: regErr } = await supabase
         .from("showup_registrants")
-        .upsert(registrant, { onConflict: "event_id,phone_e164" })
+        .insert(registrant)
         .select("*")
         .single();
 
-      if (regErr) throw new Error(regErr.message);
+      if (regErr) {
+        // Race-condition safety: if unique constraint fired concurrently, return existing cleanly
+        if (regErr.code === "23505") {
+          const { data: raceExisting } = await supabase
+            .from("showup_registrants")
+            .select("*")
+            .eq("event_id", event.id)
+            .eq("phone_e164", phoneE164)
+            .maybeSingle();
+          if (raceExisting) {
+            return NextResponse.json({
+              success: true,
+              alreadyRegistered: true,
+              registrant: raceExisting,
+              scheduledMessages: [],
+            });
+          }
+        }
+        throw new Error(regErr.message);
+      }
 
       await supabase
         .from("showup_tenants")
@@ -123,6 +196,7 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
+        alreadyRegistered: false,
         registrant: savedReg,
         scheduledMessages: scheduled,
       });
@@ -130,17 +204,10 @@ export async function POST(
 
     // Local DB fallback
     const db = readLocalDb();
-    const existingIdx = db.registrants.findIndex(
-      (r) => r.event_id === event!.id && r.phone_e164 === phoneE164
-    );
-
-    if (existingIdx >= 0) {
-      db.registrants[existingIdx].full_name = registrant.full_name;
-      registrant.id = db.registrants[existingIdx].id;
-      registrant.tracking_token = db.registrants[existingIdx].tracking_token;
-    } else {
-      db.registrants.unshift(registrant);
-      db.tenants[0].registrants_used_this_month += 1;
+    db.registrants.unshift(registrant);
+    const tTarget = db.tenants.find((t) => t.id === tenant.id);
+    if (tTarget) {
+      tTarget.registrants_used_this_month += 1;
     }
     writeLocalDb(db);
 
@@ -152,6 +219,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
+      alreadyRegistered: false,
       registrant,
       scheduledMessages: scheduled,
     });

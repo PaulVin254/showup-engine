@@ -34,6 +34,7 @@ export default function PublicRegistrationPage() {
     fullName: string;
     phoneE164: string;
     trackingToken: string;
+    alreadyRegistered?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function PublicRegistrationPage() {
         fullName: data.registrant.full_name,
         phoneE164: data.registrant.phone_e164,
         trackingToken: data.registrant.tracking_token,
+        alreadyRegistered: Boolean(data.alreadyRegistered),
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not complete registration");
@@ -190,14 +192,28 @@ export default function PublicRegistrationPage() {
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <h2 className="text-xl font-semibold text-[#111111] tracking-[-0.02em]">
-                      You&apos;re in, {registeredData.fullName}.
+                      {registeredData.alreadyRegistered
+                        ? `You're already registered, ${registeredData.fullName}.`
+                        : `You're in, ${registeredData.fullName}.`}
                     </h2>
                     <p className="text-xs text-neutral-600 leading-relaxed">
-                      We sent your confirmation to WhatsApp{" "}
-                      <strong className="text-[#111111] font-mono tracking-tight">
-                        +{registeredData.phoneE164}
-                      </strong>
-                      . Your 5-stage reminder sequence is active.
+                      {registeredData.alreadyRegistered ? (
+                        <>
+                          Your seat and WhatsApp reminders on{" "}
+                          <strong className="text-[#111111] font-mono tracking-tight">
+                            +{registeredData.phoneE164}
+                          </strong>{" "}
+                          are already active.
+                        </>
+                      ) : (
+                        <>
+                          We sent your confirmation to WhatsApp{" "}
+                          <strong className="text-[#111111] font-mono tracking-tight">
+                            +{registeredData.phoneE164}
+                          </strong>
+                          . Your 5-stage reminder sequence is active.
+                        </>
+                      )}
                     </p>
                   </div>
 

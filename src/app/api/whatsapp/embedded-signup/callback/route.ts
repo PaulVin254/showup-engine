@@ -9,6 +9,7 @@ import {
   subscribeAppToWaba,
 } from "@/lib/whatsapp-api";
 import {
+  findOtherTenantByPhoneNumberId,
   getActiveTenant,
   sanitizeTenantForClient,
   updateTenantWabaConnection,
@@ -29,6 +30,20 @@ export async function POST(req: Request) {
     const { tenant, isGuest } = await getActiveTenant();
     if (isGuest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const conflictingTenant = await findOtherTenantByPhoneNumberId(
+      String(phoneNumberId),
+      tenant.id
+    );
+    if (conflictingTenant) {
+      return NextResponse.json(
+        {
+          error:
+            "This WhatsApp Business number is already connected to another ShowUp workspace. Disconnect it in that workspace's Settings first.",
+        },
+        { status: 409 }
+      );
     }
 
     // 1. Exchange Meta OAuth authorization code for a live access token
