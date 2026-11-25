@@ -75,7 +75,7 @@ export function EmbeddedSignupModal({
           const { phone_number_id, waba_id } = data.data;
           if (waba_id) wabaIdRef.current = String(waba_id);
           if (phone_number_id) phoneNumberIdRef.current = String(phone_number_id);
-          setStatusMessage("Number verified. Finishing setup…");
+          setStatusMessage("Number verified. Finishing setup...");
         }
       } catch {
         // ignore non-JSON messages
@@ -106,7 +106,7 @@ export function EmbeddedSignupModal({
           resolve();
           return;
         } catch {
-          // Fall through to reload SDK if existing instance failed init
+          // Fall through to reload SDK
         }
       }
 
@@ -174,7 +174,7 @@ export function EmbeddedSignupModal({
         window.FB.login((response) => {
           const code = response?.authResponse?.code;
           if (code) {
-            setStatusMessage("Connecting your number and installing templates…");
+            setStatusMessage("Connecting your number and installing templates...");
             submitCallback({
               code,
               wabaId: wabaIdRef.current,
@@ -201,16 +201,16 @@ export function EmbeddedSignupModal({
       description="Send reminders from your own verified number."
       width="max-w-[420px]"
     >
-      <div className="space-y-4">
-        <div className="flex items-center justify-between h-10 px-3 rounded-md border border-white/[0.08] bg-white/[0.02]">
-          <span className="text-[12.5px] text-slate-400">Status</span>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between h-10 px-3.5 rounded-xl border border-neutral-200 bg-[#fafafa]">
+          <span className="text-[12.5px] text-neutral-500">Status</span>
           {loading ? (
             <StatusPill tone="blue" pulse>
               Connecting
             </StatusPill>
           ) : connected ? (
             <span className="flex items-center gap-2">
-              <span className="font-mono tabular-nums text-[12px] text-slate-300">
+              <span className="font-mono tabular-nums text-[12px] text-[#111111]">
                 {tenant.display_phone_number || tenant.phone_number_id}
               </span>
               <StatusPill tone="emerald">Verified</StatusPill>
@@ -229,7 +229,7 @@ export function EmbeddedSignupModal({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={EASE_OUT_FAST}
-              className="px-3 py-2.5 rounded-md border border-red-500/25 bg-red-500/[0.06] text-[12.5px] text-red-300"
+              className="px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-[12.5px] text-red-700"
             >
               {error}
             </motion.div>
@@ -241,7 +241,7 @@ export function EmbeddedSignupModal({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={EASE_OUT_FAST}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-[#1877f2]/25 bg-[#1877f2]/[0.06] text-[12.5px] text-[#8fbfff]"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-[12.5px] text-blue-800"
             >
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
               {statusMessage}
@@ -259,7 +259,7 @@ export function EmbeddedSignupModal({
           {connected ? "Reconnect with Facebook" : "Continue with Facebook"}
         </Button>
 
-        <p className="text-[12px] text-slate-500 text-center leading-relaxed">
+        <p className="text-[12px] text-neutral-500 text-center leading-relaxed">
           Choose your business and number in the Meta window. ShowUp then installs your five
           reminder templates.
         </p>
@@ -267,7 +267,7 @@ export function EmbeddedSignupModal({
         <button
           type="button"
           onClick={onClose}
-          className="block mx-auto text-[12px] text-slate-500 hover:text-white underline underline-offset-4 transition"
+          className="block mx-auto text-[12px] text-neutral-500 hover:text-[#111111] underline underline-offset-4 transition"
         >
           Keep using the ShowUp number
         </button>

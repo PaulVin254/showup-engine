@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { normalizeKenyanPhone } from "@/lib/phone";
 import {
   exchangeCodeForToken,
   fetchPhoneNumberDetails,
@@ -10,10 +9,8 @@ import {
   subscribeAppToWaba,
 } from "@/lib/whatsapp-api";
 import {
-  findOrCreateTenantByPhone,
   getActiveTenant,
   sanitizeTenantForClient,
-  setTenantSessionCookie,
   updateTenantWabaConnection,
 } from "@/lib/store";
 
@@ -29,7 +26,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const { tenant } = await getActiveTenant();
+    const { tenant, isGuest } = await getActiveTenant();
+    if (isGuest) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // 1. Exchange Meta OAuth authorization code for a live access token
     const exchanged = await exchangeCodeForToken(String(code));
@@ -60,36 +60,21 @@ export async function POST(req: Request) {
       // Templates can also be synced/created from Settings
     }
 
-    // 3. Persist WABA connection to Tenant record
-    let targetTenant = tenant;
-    if (targetTenant.id === "guest") {
-      const normPhone =
-        normalizeKenyanPhone(resolvedDisplayPhone) || `waba_${wabaId}`;
-      targetTenant = await findOrCreateTenantByPhone({
-        phoneE164: normPhone,
-        hostName: "Connected Business",
-      });
-    }
-
+    // 3. Persist WABA connection to authenticated Tenant record
     const updatedTenant = await updateTenantWabaConnection({
-      tenantId: targetTenant.id,
+      tenantId: tenant.id,
       wabaId: String(wabaId),
       phoneNumberId: String(phoneNumberId),
       displayPhoneNumber: resolvedDisplayPhone || null,
       accessToken: clientAccessToken,
     });
 
-    const res = NextResponse.json({
+    return NextResponse.json({
       success: true,
       tenant: sanitizeTenantForClient(updatedTenant),
       message:
         "Official WhatsApp Business Account connected & 5 Webinar Templates provisioned!",
     });
-
-    if (updatedTenant.id && updatedTenant.id !== "guest") {
-      setTenantSessionCookie(res, updatedTenant.id);
-    }
-    return res;
   } catch (err: unknown) {
     return NextResponse.json(
       {

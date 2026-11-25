@@ -14,18 +14,7 @@ export async function GET() {
     const { tenant, supabaseReady, isGuest } = await getActiveTenant();
 
     if (isGuest) {
-      return NextResponse.json({
-        supabaseReady,
-        isGuest: true,
-        tenant: sanitizeTenantForClient(tenant),
-        events: [],
-        templates: seedSystemTemplatesForTenant("guest"),
-        registrants: [],
-        scheduled_messages: [],
-        payments: [],
-        metaConfigId: process.env.NEXT_PUBLIC_META_CONFIG_ID || "1433645942194259",
-        metaAppId: process.env.NEXT_PUBLIC_META_APP_ID || "",
-      });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     if (supabaseReady && supabase) {

@@ -259,9 +259,9 @@ function renderWaitingRoomHtml({
 
 export async function GET(
   req: Request,
-  { params }: { params: { token: string } }
+  context: { params: Promise<{ token: string }> }
 ) {
-  const { token } = params;
+  const { token } = await context.params;
   const url = new URL(req.url);
   const isCheckPoll =
     url.searchParams.get("check") === "1" ||

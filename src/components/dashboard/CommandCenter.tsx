@@ -85,15 +85,18 @@ function Countdown({ ms }: { ms: number }) {
     [pad2(s), "sec"],
   ];
   return (
-    <div className="flex items-end gap-1" aria-label="Time until start">
+    <div
+      className="inline-flex items-end gap-1.5 rounded-2xl bg-[#f4f4f5] border border-neutral-200 px-4 py-2.5"
+      aria-label="Time until start"
+    >
       {cells.map(([v, l], i) => (
         <React.Fragment key={l}>
-          {i > 0 && <span className="pb-3 text-slate-700 font-mono text-lg">:</span>}
-          <div className="min-w-[44px] text-center">
-            <div className="font-mono tabular-nums text-[28px] leading-none font-medium text-white">
+          {i > 0 && <span className="pb-3 text-neutral-300 font-mono text-base">:</span>}
+          <div className="min-w-[40px] text-center">
+            <div className="font-mono tabular-nums text-[24px] leading-none font-semibold text-[#111111]">
               {v}
             </div>
-            <div className="mt-1.5 text-[10px] uppercase tracking-wider text-slate-500">{l}</div>
+            <div className="mt-1 text-[10px] uppercase tracking-wider text-neutral-500">{l}</div>
           </div>
         </React.Fragment>
       ))}
@@ -130,7 +133,6 @@ export function CommandCenter(props: CommandCenterProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Close menu on outside click
   React.useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -157,7 +159,6 @@ export function CommandCenter(props: CommandCenterProps) {
     setTimeout(() => setCopied(null), 1600);
   };
 
-  // First stage that has not completed → "Next"
   const summaries = PIPELINE_STAGES.map((s) => summarizeStage(messages, s.key));
   const nextIdx = summaries.findIndex((s) => s.state !== "done");
 
@@ -168,15 +169,15 @@ export function CommandCenter(props: CommandCenterProps) {
     mode === "live"
       ? [
           { label: "In the room", value: String(m.attended), sub: `of ${m.total} registered`, tone: "text-[#00a884]" },
-          { label: "Join-link CTR", value: `${m.showupPct}%`, sub: `${event.baseline_showup_rate || 18}% baseline`, tone: "text-white" },
-          { label: "Not joined yet", value: String(m.notJoined), sub: "still reachable", tone: "text-white" },
-          { label: "Failed sends", value: String(m.failed), sub: m.failed ? "needs attention" : "all clear", tone: m.failed ? "text-red-400" : "text-white" },
+          { label: "Join-link CTR", value: `${m.showupPct}%`, sub: `${event.baseline_showup_rate || 18}% baseline`, tone: "text-[#111111]" },
+          { label: "Not joined yet", value: String(m.notJoined), sub: "still reachable", tone: "text-[#111111]" },
+          { label: "Failed sends", value: String(m.failed), sub: m.failed ? "needs attention" : "all clear", tone: m.failed ? "text-red-600" : "text-[#111111]" },
         ]
       : [
-          { label: "Registrants", value: String(m.total), sub: addedToday ? `+${addedToday} in 24h` : `${m.optedOut} opted out`, tone: "text-white" },
-          { label: "Messages sent", value: String(m.messagesSent), sub: `${PIPELINE_STAGES.length} stage sequence`, tone: "text-white" },
-          { label: "Delivery rate", value: m.deliveryPct === null ? "—" : `${m.deliveryPct}%`, sub: m.failed ? `${m.failed} failed` : "no failures", tone: m.deliveryPct !== null && m.deliveryPct >= 90 ? "text-[#00a884]" : "text-white" },
-          { label: "Read rate", value: m.readPct === null ? "—" : `${m.readPct}%`, sub: "of delivered", tone: "text-white" },
+          { label: "Registrants", value: String(m.total), sub: addedToday ? `+${addedToday} in 24h` : `${m.optedOut} opted out`, tone: "text-[#111111]" },
+          { label: "Messages sent", value: String(m.messagesSent), sub: `${PIPELINE_STAGES.length} stage sequence`, tone: "text-[#111111]" },
+          { label: "Delivery rate", value: m.deliveryPct === null ? "-" : `${m.deliveryPct}%`, sub: m.failed ? `${m.failed} failed` : "no failures", tone: m.deliveryPct !== null && m.deliveryPct >= 90 ? "text-[#00a884]" : "text-[#111111]" },
+          { label: "Read rate", value: m.readPct === null ? "-" : `${m.readPct}%`, sub: "of delivered", tone: "text-[#111111]" },
         ];
 
   const joined = registrants
@@ -188,12 +189,10 @@ export function CommandCenter(props: CommandCenterProps) {
   const feed = mode === "live" ? joined.slice(0, 8) : recent;
 
   return (
-    <div className="animate-rise">
-      {/* ---------------------------------------------------------- */}
-      {/* Event header                                                */}
-      {/* ---------------------------------------------------------- */}
-      <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/[0.08] flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-5">
-        <div className="min-w-0 space-y-2">
+    <div className="animate-rise bg-white text-[#111111]">
+      {/* Event header */}
+      <div className="px-4 sm:px-6 py-5 border-b border-neutral-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-5">
+        <div className="min-w-0 flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             {mode === "live" ? (
               <StatusPill tone="red" pulse>Live room</StatusPill>
@@ -202,20 +201,20 @@ export function CommandCenter(props: CommandCenterProps) {
             ) : (
               <StatusPill tone="amber">Draft · reminders paused</StatusPill>
             )}
-            <span className="font-mono tabular-nums text-[11px] text-slate-500">
+            <span className="font-mono tabular-nums text-[11px] text-neutral-500">
               {fmtEat(start, { date: true })} EAT
             </span>
           </div>
-          <h1 className="text-[19px] sm:text-[22px] leading-tight font-semibold tracking-tight text-white break-words sm:truncate">
+          <h1 className="text-[20px] sm:text-[24px] leading-tight font-semibold tracking-tight text-[#111111] break-words sm:truncate">
             {event.title}
           </h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-slate-400">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-neutral-500">
             {event.join_url ? (
               <a
                 href={event.join_url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 hover:text-white transition max-w-[200px] sm:max-w-[240px]"
+                className="inline-flex items-center gap-1 hover:text-[#111111] transition max-w-[200px] sm:max-w-[240px]"
               >
                 <span className="truncate">{event.join_url.replace(/^https?:\/\//, "")}</span>
                 <ExternalLink className="w-3 h-3 shrink-0" />
@@ -224,24 +223,24 @@ export function CommandCenter(props: CommandCenterProps) {
               <button
                 type="button"
                 onClick={onEdit}
-                className="inline-flex items-center gap-1 text-amber-300 hover:text-amber-200 transition font-medium"
+                className="inline-flex items-center gap-1 text-amber-800 hover:text-amber-950 transition font-medium"
               >
-                <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
+                <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
                 <span>Meeting link pending · click to add</span>
               </button>
             )}
             <button
               type="button"
               onClick={() => copy("reg", regUrl, "Registration link copied")}
-              className="inline-flex items-center gap-1 font-mono hover:text-white transition max-w-full"
+              className="inline-flex items-center gap-1.5 font-mono px-2.5 py-0.5 rounded-full bg-[#f4f4f5] hover:bg-neutral-200/80 text-[#111111] transition max-w-full"
             >
-              {copied === "reg" ? <Check className="w-3 h-3 text-[#00a884] shrink-0" /> : <Copy className="w-3 h-3 shrink-0" />}
+              {copied === "reg" ? <Check className="w-3 h-3 text-[#00a884] shrink-0" /> : <Copy className="w-3 h-3 shrink-0 text-neutral-500" />}
               <span className="truncate">/r/{event.slug}</span>
             </button>
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex items-center gap-1 hover:text-white transition"
+              className="inline-flex items-center gap-1 hover:text-[#111111] transition"
             >
               <Pencil className="w-3 h-3" />
               Edit
@@ -251,20 +250,20 @@ export function CommandCenter(props: CommandCenterProps) {
                 <button
                   type="button"
                   onClick={() => setMenuOpen((prev) => !prev)}
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-md hover:bg-white/[0.08] text-slate-400 hover:text-white transition"
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-full hover:bg-neutral-100 text-neutral-500 hover:text-[#111111] transition"
                   title="More actions"
                 >
                   <MoreHorizontal className="w-3.5 h-3.5" />
                 </button>
                 {menuOpen && (
-                  <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1 z-40 w-44 rounded-lg bg-[#14171d] border border-white/[0.1] shadow-2xl py-1 text-[12.5px] backdrop-blur-md">
+                  <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1 z-40 w-44 rounded-xl bg-white border border-neutral-200 shadow-xl py-1 text-[12.5px]">
                     <button
                       type="button"
                       onClick={() => {
                         setMenuOpen(false);
                         onEdit();
                       }}
-                      className="w-full text-left px-3 py-1.5 text-slate-300 hover:text-white hover:bg-white/[0.06] flex items-center gap-2"
+                      className="w-full text-left px-3 py-1.5 text-neutral-700 hover:text-[#111111] hover:bg-[#f4f4f5] flex items-center gap-2"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       Edit webinar
@@ -275,10 +274,10 @@ export function CommandCenter(props: CommandCenterProps) {
                         setMenuOpen(false);
                         setConfirmDeleteOpen(true);
                       }}
-                      className="w-full text-left px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/[0.08] flex items-center gap-2"
+                      className="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 flex items-center gap-2"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      Delete webinar…
+                      Delete webinar...
                     </button>
                   </div>
                 )}
@@ -289,23 +288,23 @@ export function CommandCenter(props: CommandCenterProps) {
 
         <div className="shrink-0 lg:text-right">
           {mode === "live" ? (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 lg:justify-end text-[11px] uppercase tracking-wider text-slate-500">
-                <Radio className="w-3.5 h-3.5 text-red-400" />
+            <div className="inline-flex flex-col lg:items-end gap-1 rounded-2xl bg-[#f4f4f5] border border-neutral-200 px-4 py-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-neutral-500">
+                <Radio className="w-3.5 h-3.5 text-red-500" />
                 {elapsed < 0 ? "Room opens at start" : "Elapsed since start"}
               </div>
-              <div className="font-mono tabular-nums text-[28px] sm:text-[34px] leading-none font-medium text-white">
+              <div className="font-mono tabular-nums text-[26px] sm:text-[30px] leading-none font-semibold text-[#111111]">
                 {elapsed < 0
-                  ? `−${pad2(Math.floor(-elapsed / 60000))}:${pad2(Math.floor((-elapsed % 60000) / 1000))}`
+                  ? `-${pad2(Math.floor(-elapsed / 60000))}:${pad2(Math.floor((-elapsed % 60000) / 1000))}`
                   : `T+${pad2(Math.floor(elapsed / 60000))}:${pad2(Math.floor((elapsed % 60000) / 1000))}`}
               </div>
-              <div className="text-[11px] text-slate-500 font-mono tabular-nums">
+              <div className="text-[11px] text-neutral-500 font-mono tabular-nums">
                 monitor closes in {Math.max(0, Math.floor(windowLeft / 60000))}m
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="text-[11px] uppercase tracking-wider text-slate-500">
+            <div className="flex flex-col lg:items-end gap-1.5">
+              <div className="text-[11px] uppercase tracking-wider text-neutral-500">
                 Starts in · {fmtEat(start)} EAT
               </div>
               <Countdown ms={msToStart} />
@@ -316,10 +315,10 @@ export function CommandCenter(props: CommandCenterProps) {
 
       {/* Draft launch bar */}
       {!paid && (
-        <div className="px-4 sm:px-6 py-2.5 border-b border-amber-400/20 bg-amber-400/[0.04] flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[12.5px] text-amber-100/90">
+        <div className="px-4 sm:px-6 py-2.5 border-b border-amber-200 bg-amber-50/75 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[12.5px] text-amber-950">
             <span className="font-medium">{m.total} registrants are queued.</span>{" "}
-            <span className="text-amber-100/60">The sequence starts sending when you launch.</span>
+            <span className="text-amber-800/80">The sequence starts sending when you launch.</span>
           </p>
           <Button size="sm" variant="success" onClick={onLaunch} icon={<Smartphone className="w-3.5 h-3.5" />}>
             Launch · KES 1,500 via M-Pesa
@@ -329,11 +328,11 @@ export function CommandCenter(props: CommandCenterProps) {
 
       {/* Missing live meeting link banner */}
       {!event.join_url && (
-        <div className="px-4 sm:px-6 py-2.5 border-b border-amber-500/25 bg-amber-500/[0.08] flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-[12.5px] text-amber-200">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+        <div className="px-4 sm:px-6 py-2.5 border-b border-amber-200 bg-amber-50 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[12.5px] text-amber-950">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
-              <strong>Meeting link not added yet.</strong> Stage 5 (Live Link) requires your Zoom or Google Meet URL before T−5m.
+              <strong>Meeting link not added yet.</strong> Stage 5 (Live Link) requires your Zoom or Google Meet URL before T-5m.
             </span>
           </div>
           <Button size="sm" variant="brand" onClick={onEdit} icon={<Pencil className="w-3.5 h-3.5" />}>
@@ -342,31 +341,27 @@ export function CommandCenter(props: CommandCenterProps) {
         </div>
       )}
 
-      {/* ---------------------------------------------------------- */}
-      {/* Metrics strip                                               */}
-      {/* ---------------------------------------------------------- */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 border-b border-white/[0.08] divide-x divide-white/[0.08] [&>*:nth-child(n+3)]:max-lg:border-t [&>*:nth-child(n+3)]:max-lg:border-white/[0.08]">
+      {/* Metrics strip (shadcn Dashboard style) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 border-b border-neutral-200 divide-x divide-neutral-200 [&>*:nth-child(n+3)]:max-lg:border-t [&>*:nth-child(n+3)]:max-lg:border-neutral-200 bg-white">
         {metrics.map((x) => (
-          <div key={x.label} className="px-4 sm:px-6 py-3.5 sm:py-4 min-w-0">
-            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 truncate">
+          <div key={x.label} className="px-4 sm:px-6 py-4 min-w-0">
+            <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-neutral-500 truncate">
               {x.label}
             </div>
-            <div className={cn("mt-1.5 font-mono tabular-nums text-[22px] sm:text-[26px] leading-none font-medium", x.tone)}>
+            <div className={cn("mt-1.5 font-mono tabular-nums text-[24px] sm:text-[28px] leading-none font-semibold", x.tone)}>
               {x.value}
             </div>
-            <div className="mt-1.5 text-[11.5px] text-slate-500 truncate">{x.sub}</div>
+            <div className="mt-1.5 text-[11.5px] text-neutral-500 truncate">{x.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* ---------------------------------------------------------- */}
-      {/* Split command view                                          */}
-      {/* ---------------------------------------------------------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] lg:divide-x divide-white/[0.08]">
+      {/* Split command view */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] lg:divide-x divide-neutral-200">
         {/* LEFT: pipeline + actions + feed */}
-        <div className="min-w-0 divide-y divide-white/[0.08]">
+        <div className="min-w-0 divide-y divide-neutral-200">
           <section>
-            <SectionLabel right={<span className="text-[11px] text-slate-600">All times EAT</span>}>
+            <SectionLabel right={<span className="text-[11px] text-neutral-500">All times EAT</span>}>
               Sequence pipeline
             </SectionLabel>
             <ol>
@@ -381,56 +376,56 @@ export function CommandCenter(props: CommandCenterProps) {
                       <motion.span
                         layoutId="pipeline-active-row"
                         transition={SPRING_SNAPPY}
-                        className="absolute inset-0 bg-white/[0.035] border-l-2 border-l-[#1877f2] pointer-events-none"
+                        className="absolute inset-0 bg-[#f4f4f5]/90 border-l-2 border-l-[#111111] pointer-events-none"
                       />
                     )}
                     <button
                       type="button"
                       onClick={() => setPreviewStage(st.key)}
                       className={cn(
-                        "relative w-full grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left transition border-b border-white/[0.05] last:border-b-0",
-                        !selected && "hover:bg-white/[0.02]"
+                        "relative w-full grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 text-left transition border-b border-neutral-100 last:border-b-0",
+                        !selected && "hover:bg-[#fafafa]"
                       )}
                     >
                       <span aria-hidden className="flex justify-center">
                         {sum.state === "done" ? (
                           <CheckCircle2 className="w-[18px] h-[18px] text-[#00a884]" />
                         ) : sum.state === "failed" ? (
-                          <AlertCircle className="w-[18px] h-[18px] text-red-400" />
+                          <AlertCircle className="w-[18px] h-[18px] text-red-500" />
                         ) : sum.state === "partial" ? (
-                          <Loader2 className="w-[18px] h-[18px] text-[#1877f2] animate-spin" />
+                          <Loader2 className="w-[18px] h-[18px] text-[#111111] animate-spin" />
                         ) : (
-                          <Circle className={cn("w-[18px] h-[18px]", isNext ? "text-[#1877f2]" : "text-slate-700")} />
+                          <Circle className={cn("w-[18px] h-[18px]", isNext ? "text-[#111111]" : "text-neutral-300")} />
                         )}
                       </span>
                       <span className="min-w-0">
                         <span className="flex items-center gap-2">
-                          <span className="text-[13px] font-medium text-white">{st.label}</span>
+                          <span className="text-[13px] font-medium text-[#111111]">{st.label}</span>
                           {isNext && <StatusPill tone="blue" dot={false}>Next</StatusPill>}
                           {st.key === "live_now" && !event.join_url && (
                             <StatusPill tone="amber" dot={false}>Link pending</StatusPill>
                           )}
                         </span>
-                        <span className="block text-[11.5px] text-slate-500 font-mono tabular-nums truncate">
+                        <span className="block text-[11.5px] text-neutral-500 font-mono tabular-nums truncate">
                           {stageTimingLabel(st, event)}
                         </span>
                       </span>
                       <span className="flex items-center gap-4">
                         <span className="hidden sm:block w-24">
-                          <span className="block h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+                          <span className="block h-[4px] rounded-full bg-neutral-100 overflow-hidden">
                             <span
-                              className={cn("block h-full rounded-full transition-all duration-500", sum.failed ? "bg-red-400" : "bg-[#00a884]")}
+                              className={cn("block h-full rounded-full transition-all duration-500", sum.failed ? "bg-red-500" : "bg-[#00a884]")}
                               style={{ width: `${pct}%` }}
                             />
                           </span>
                         </span>
-                        <span className="w-[72px] text-right font-mono tabular-nums text-[12px] text-slate-400">
+                        <span className="w-[72px] text-right font-mono tabular-nums text-[12px] text-neutral-600">
                           {sum.sent}
-                          <span className="text-slate-600">/{m.total}</span>
+                          <span className="text-neutral-400">/{m.total}</span>
                         </span>
                       </span>
                     </button>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition bg-[#0f1115] pl-2">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition bg-white/95 rounded-full pl-2">
                       <Button
                         size="sm"
                         loading={dispatchingStage === st.key}
@@ -463,7 +458,7 @@ export function CommandCenter(props: CommandCenterProps) {
                 e.target.value = "";
               }}
             />
-            <div className="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08]">
+            <div className="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-neutral-200">
               {[
                 {
                   icon: FileUp,
@@ -495,17 +490,17 @@ export function CommandCenter(props: CommandCenterProps) {
                   type="button"
                   disabled={!a.onClick}
                   onClick={a.onClick}
-                  className="flex items-start gap-3 px-4 py-3.5 text-left transition hover:bg-white/[0.025] disabled:hover:bg-transparent disabled:cursor-default"
+                  className="flex items-start gap-3 px-4 py-4 text-left transition hover:bg-[#fafafa] disabled:hover:bg-transparent disabled:cursor-default"
                 >
                   <a.icon
                     className={cn(
                       "w-4 h-4 mt-0.5 shrink-0",
-                      a.tone === "emerald" ? "text-[#00a884]" : a.tone === "blue" ? "text-[#1877f2]" : "text-slate-400"
+                      a.tone === "emerald" ? "text-[#00a884]" : a.tone === "blue" ? "text-[#111111]" : "text-neutral-500"
                     )}
                   />
                   <span className="min-w-0">
-                    <span className="block text-[13px] font-medium text-white">{a.title}</span>
-                    <span className="block text-[11.5px] text-slate-500 truncate">{a.sub}</span>
+                    <span className="block text-[13px] font-medium text-[#111111]">{a.title}</span>
+                    <span className="block text-[11.5px] text-neutral-500 truncate">{a.sub}</span>
                   </span>
                 </button>
               ))}
@@ -518,7 +513,7 @@ export function CommandCenter(props: CommandCenterProps) {
                 <button
                   type="button"
                   onClick={onOpenRegistrants}
-                  className="inline-flex items-center gap-1 text-[11.5px] text-[#5aa2ff] hover:text-white transition"
+                  className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#111111] hover:underline transition"
                 >
                   All {m.total}
                   <ArrowUpRight className="w-3 h-3" />
@@ -529,12 +524,12 @@ export function CommandCenter(props: CommandCenterProps) {
             </SectionLabel>
             {feed.length === 0 ? (
               <div className="px-4 py-8 text-center">
-                <Users className="w-4 h-4 mx-auto text-slate-600" />
-                <p className="mt-2 text-[12.5px] text-slate-400">
+                <Users className="w-4 h-4 mx-auto text-neutral-400" />
+                <p className="mt-2 text-[12.5px] text-neutral-600">
                   {mode === "live" ? "No one has clicked the join link yet." : "No registrants yet."}
                 </p>
                 {mode === "scheduled" && (
-                  <p className="text-[11.5px] text-slate-600 mt-0.5">
+                  <p className="text-[11.5px] text-neutral-500 mt-0.5">
                     Share the registration link or import a CSV to start the sequence.
                   </p>
                 )}
@@ -544,17 +539,17 @@ export function CommandCenter(props: CommandCenterProps) {
                 {feed.map((r) => (
                   <li
                     key={r.id}
-                    className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.05] last:border-b-0 text-[12.5px] animate-rise"
+                    className="flex items-center gap-3 px-4 py-2.5 border-b border-neutral-100 last:border-b-0 text-[12.5px] animate-rise hover:bg-[#fafafa] transition-colors"
                   >
-                    <span className="w-6 h-6 rounded-full bg-white/[0.06] text-[10.5px] font-medium text-slate-300 flex items-center justify-center shrink-0">
+                    <span className="w-7 h-7 rounded-full bg-[#f4f4f5] border border-neutral-200 text-[10.5px] font-semibold text-[#111111] flex items-center justify-center shrink-0">
                       {r.full_name.charAt(0).toUpperCase()}
                     </span>
-                    <span className="text-white font-medium truncate min-w-0 flex-1">{r.full_name}</span>
-                    <span className="hidden sm:block font-mono tabular-nums text-slate-500">
+                    <span className="text-[#111111] font-medium truncate min-w-0 flex-1">{r.full_name}</span>
+                    <span className="hidden sm:block font-mono tabular-nums text-neutral-500">
                       {formatPhoneDisplay(r.phone_e164)}
                     </span>
-                    <span className="text-slate-500 w-16 text-right">{SOURCE_LABEL[r.source]}</span>
-                    <span className="w-16 text-right font-mono tabular-nums text-slate-500">
+                    <span className="text-neutral-500 w-16 text-right">{SOURCE_LABEL[r.source]}</span>
+                    <span className="w-16 text-right font-mono tabular-nums text-neutral-500">
                       {mode === "live" && r.joined_at ? fmtEat(r.joined_at) : relativeAgo(r.created_at, now)}
                     </span>
                   </li>
@@ -564,8 +559,8 @@ export function CommandCenter(props: CommandCenterProps) {
           </section>
         </div>
 
-        {/* RIGHT: native WhatsApp preview */}
-        <div className="min-w-0 p-4 sm:p-5 border-t lg:border-t-0 border-white/[0.08] lg:sticky lg:top-12 lg:self-start">
+        {/* RIGHT: native WhatsApp preview inside Mobbin tray */}
+        <div className="min-w-0 p-4 sm:p-5 border-t lg:border-t-0 border-neutral-200 lg:sticky lg:top-14 lg:self-start">
           <PhonePreview
             event={event}
             templates={templates}
@@ -612,11 +607,11 @@ export function CommandCenter(props: CommandCenterProps) {
           </>
         }
       >
-        <div className="text-[13px] text-slate-300 leading-relaxed space-y-2">
+        <div className="text-[13px] text-neutral-600 leading-relaxed flex flex-col gap-2">
           <p>
-            Permanently delete <strong className="text-white">&quot;{event.title}&quot;</strong>?
+            Permanently delete <strong className="text-[#111111]">&quot;{event.title}&quot;</strong>?
           </p>
-          <p className="text-[12px] text-slate-400">
+          <p className="text-[12px] text-neutral-500">
             This will remove all scheduled WhatsApp sequence messages and attendee tracking links for this room. This action cannot be undone.
           </p>
         </div>
@@ -624,4 +619,3 @@ export function CommandCenter(props: CommandCenterProps) {
     </div>
   );
 }
-

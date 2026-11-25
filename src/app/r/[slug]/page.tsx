@@ -2,20 +2,25 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calendar, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { useParams } from "next/navigation";
+import { Calendar, Check, CheckCircle2, Clock, Loader2, ShieldCheck } from "lucide-react";
 import { ShowUpEvent } from "@/lib/types";
 import { buildGoogleCalendarUrl, formatEatDate } from "@/lib/default-templates";
-import { BrandRibbon, BrandWordmark, InlineAvatarToken } from "@/components/BrandMark";
+import { BrandWordmark } from "@/components/BrandMark";
 
-const MUSE_INPUT =
-  "w-full px-6 py-4 rounded-full bg-[#25272c] border border-white/[0.06] text-white text-[15px] placeholder:text-[#8a909e] focus:outline-none focus:border-[#4589ff] transition";
+const LIGHT_INPUT =
+  "w-full px-4 py-3 rounded-xl bg-white border border-neutral-200 text-[#111111] text-[14px] placeholder:text-neutral-400 focus:outline-none focus:border-[#111111] focus:ring-2 focus:ring-neutral-900/10 transition";
 
-export default function PublicRegistrationPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const { slug } = params;
+const WHAT_HAPPENS = [
+  "Instant WhatsApp seat confirmation",
+  "1-click Google Calendar lock",
+  "24h & 60m EAT reminders before start",
+  "Private live room link 5 mins before doors open",
+];
+
+export default function PublicRegistrationPage() {
+  const params = useParams<{ slug: string }>();
+  const slug = typeof params?.slug === "string" ? params.slug : "";
   const [event, setEvent] = useState<ShowUpEvent | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
 
@@ -32,14 +37,16 @@ export default function PublicRegistrationPage({
   } | null>(null);
 
   useEffect(() => {
-    fetch("/api/state")
-      .then((r) => r.json())
+    if (!slug) {
+      setLoadingEvent(false);
+      return;
+    }
+    fetch(`/api/events/public/${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : { event: null }))
       .then((data) => {
-        const found = (data.events || []).find(
-          (e: ShowUpEvent) => e.slug === slug || e.id === slug
-        );
-        setEvent(found || data.events?.[0] || null);
+        setEvent(data.event || null);
       })
+      .catch(() => setEvent(null))
       .finally(() => setLoadingEvent(false));
   }, [slug]);
 
@@ -80,8 +87,8 @@ export default function PublicRegistrationPage({
 
   if (loadingEvent) {
     return (
-      <div className="min-h-screen bg-canvas flex items-center justify-center text-[#8a909e] text-sm">
-        <Loader2 className="w-5 h-5 animate-spin mr-2 text-[#4589ff]" />
+      <div className="min-h-screen bg-[#f6f6f7] flex items-center justify-center text-neutral-500 text-sm">
+        <Loader2 className="w-4 h-4 animate-spin mr-2 text-[#111111]" />
         Loading registration...
       </div>
     );
@@ -89,13 +96,13 @@ export default function PublicRegistrationPage({
 
   if (!event) {
     return (
-      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6 text-center">
-        <h1 className="text-3xl font-medium text-white tracking-[-0.03em]">
+      <div className="min-h-screen bg-[#f6f6f7] flex flex-col items-center justify-center p-6 text-center">
+        <h1 className="text-3xl font-semibold text-[#111111] tracking-[-0.03em]">
           Event not found
         </h1>
         <Link
           href="/dashboard"
-          className="mt-5 px-5 py-2.5 rounded-full bg-[#25272c] text-sm text-white hover:bg-[#2f3238] transition"
+          className="mt-5 px-5 py-2.5 rounded-full bg-[#111111] text-sm font-medium text-white hover:bg-neutral-800 transition"
         >
           Return to dashboard
         </Link>
@@ -110,155 +117,206 @@ export default function PublicRegistrationPage({
   });
 
   return (
-    <div className="min-h-screen bg-canvas text-slate-100 flex flex-col justify-between">
-      {/* Edge-to-edge borderless Muse header */}
-      <header className="w-full px-6 sm:px-10 py-5 flex items-center justify-between">
+    <div className="min-h-screen bg-[#f6f6f7] text-[#111111] flex flex-col justify-between">
+      {/* Minimal Light Header */}
+      <header className="w-full bg-white/90 backdrop-blur-md border-b border-neutral-200/80 px-4 sm:px-10 py-4 flex items-center justify-between">
         <Link href="/" aria-label="ShowUp Home">
           <BrandWordmark />
         </Link>
         <Link
           href="/dashboard"
-          className="inline-flex items-center justify-center rounded-full bg-[#1877f2] hover:bg-[#2e86f8] text-white font-medium text-xs sm:text-sm px-4 py-2 transition"
+          className="inline-flex items-center justify-center rounded-full bg-[#f4f4f5] hover:bg-neutral-200/80 border border-neutral-200 text-[#111111] font-medium text-xs sm:text-sm px-4 py-2 transition"
         >
           Host dashboard
         </Link>
       </header>
 
-      {/* Centerpiece — direct on velvet charcoal canvas like Meta Muse */}
-      <main className="max-w-2xl w-full mx-auto px-4 sm:px-6 py-8 my-auto text-center">
-        <div className="mb-6 flex justify-center">
-          <BrandRibbon className="w-16 h-14 sm:w-20 sm:h-16" />
-        </div>
+      {/* Split Cal.com / Dub.co Event Card inside Recessed Mobbin Tray */}
+      <main className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 my-auto">
+        <div className="rounded-[28px] bg-[#ececee] p-2 sm:p-3 border border-neutral-200/90 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.08)]">
+          <div className="bg-white rounded-[22px] border border-neutral-200/80 overflow-hidden grid grid-cols-1 md:grid-cols-12">
+            {/* Left Info Column */}
+            <div className="md:col-span-6 p-6 sm:p-8 bg-[#fafafa] border-b md:border-b-0 md:border-r border-neutral-200/80 flex flex-col justify-between gap-6 text-left">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-neutral-200 text-xs font-medium text-[#111111]">
+                    <Calendar className="w-3.5 h-3.5 text-[#00a884]" />
+                    {dateStr}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-neutral-200 text-xs font-mono text-[#111111]">
+                    <Clock className="w-3.5 h-3.5 text-[#00a884]" />
+                    {timeStr} EAT
+                  </span>
+                </div>
 
-        <h1 className="text-3xl sm:text-5xl font-medium tracking-[-0.034em] leading-[1.12] text-white">
-          {event.title}
-          <InlineAvatarToken />
-        </h1>
+                <h1 className="mt-5 text-2xl sm:text-3xl font-semibold tracking-[-0.03em] leading-[1.15] text-[#111111]">
+                  {event.title}
+                </h1>
 
-        <p className="mt-4 text-sm sm:text-base text-[#9ca3af] max-w-lg mx-auto leading-relaxed">
-          Hosted by <span className="text-white">{event.host_name}</span>. Discover{" "}
-          {event.teaser_hook}.
-        </p>
-
-        <div className="mt-5 flex items-center justify-center gap-2.5 flex-wrap">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#17191e] border border-white/[0.06] text-xs text-[#e2e8f0]">
-            <Calendar className="w-3.5 h-3.5 text-[#4589ff]" />
-            {dateStr}
-          </span>
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#17191e] border border-white/[0.06] text-xs text-[#e2e8f0] font-mono tracking-tight">
-            <Clock className="w-3.5 h-3.5 text-[#4589ff]" />
-            {timeStr} EAT
-          </span>
-        </div>
-
-        <div className="mt-9 max-w-md mx-auto">
-          {registeredData ? (
-            <div className="p-7 rounded-3xl bg-[#17191e] border border-white/[0.06] space-y-5 text-center">
-              <div className="w-12 h-12 rounded-full bg-[#4589ff]/15 text-[#4589ff] flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-6 h-6" />
-              </div>
-              <div className="space-y-1.5">
-                <h2 className="text-xl font-medium text-white tracking-[-0.02em]">
-                  You&apos;re in, {registeredData.fullName}.
-                </h2>
-                <p className="text-xs text-[#9ca3af] leading-relaxed">
-                  We sent your confirmation to WhatsApp{" "}
-                  <strong className="text-white font-mono tracking-tight">
-                    +{registeredData.phoneE164}
-                  </strong>
-                  . Your 5-stage reminder sequence is active.
+                <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
+                  {event.host_name && !/^your('?s)?(\s+live\s+room)?$/i.test(event.host_name.trim()) ? (
+                    <>
+                      Hosted by{" "}
+                      <span className="font-medium text-[#111111]">{event.host_name}</span>.{" "}
+                    </>
+                  ) : null}
+                  Discover {event.teaser_hook}.
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2.5 pt-1">
-                <a
-                  href={gcalUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-full bg-[#25272c] hover:bg-[#2f3238] text-xs font-medium text-white transition"
-                >
-                  <Calendar className="w-4 h-4 text-[#4589ff]" />
-                  Add to Google Calendar
-                </a>
-                <a
-                  href={`/j/${registeredData.trackingToken}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-full bg-[#4589ff] hover:bg-[#5896ff] text-xs font-medium text-white transition"
-                >
-                  Test tracked join link
-                </a>
+              <div className="pt-5 border-t border-neutral-200/80">
+                <div className="text-xs font-medium text-neutral-500 mb-3">
+                  What happens after you register
+                </div>
+                <ul className="flex flex-col gap-2.5 text-xs text-neutral-700">
+                  {WHAT_HAPPENS.map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="mt-0.5 w-4 h-4 rounded-full bg-emerald-50 border border-emerald-200 text-[#00a884] flex items-center justify-center shrink-0">
+                        <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                      </span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="text-sm text-[#b0b6c2] mb-3">
-                Reserve your live seat on WhatsApp
-              </div>
 
-              {error && (
-                <div className="px-4 py-3 rounded-2xl bg-red-500/10 text-red-300 text-xs">
-                  {error}
+            {/* Right Registration / Confirmation Column */}
+            <div className="md:col-span-6 p-6 sm:p-8 bg-white text-left flex flex-col justify-center">
+              {registeredData ? (
+                <div className="flex flex-col gap-5 text-center py-2">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 text-[#00a884] flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <h2 className="text-xl font-semibold text-[#111111] tracking-[-0.02em]">
+                      You&apos;re in, {registeredData.fullName}.
+                    </h2>
+                    <p className="text-xs text-neutral-600 leading-relaxed">
+                      We sent your confirmation to WhatsApp{" "}
+                      <strong className="text-[#111111] font-mono tracking-tight">
+                        +{registeredData.phoneE164}
+                      </strong>
+                      . Your 5-stage reminder sequence is active.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2.5 pt-2">
+                    <a
+                      href={gcalUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-[#f4f4f5] hover:bg-neutral-200/80 border border-neutral-200 text-xs font-medium text-[#111111] transition"
+                    >
+                      <Calendar className="w-4 h-4 text-[#00a884]" />
+                      Add to Google Calendar
+                    </a>
+                    <a
+                      href={`/j/${registeredData.trackingToken}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-[#111111] hover:bg-neutral-800 text-xs font-medium text-white transition"
+                    >
+                      Test tracked join link
+                    </a>
+                  </div>
                 </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#111111] tracking-tight">
+                      Reserve your live seat
+                    </h2>
+                    <p className="text-xs text-neutral-500 mt-0.5">
+                      Receive reminders and your join link directly on WhatsApp.
+                    </p>
+                  </div>
+
+                  {error && (
+                    <div className="px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="reg-name" className="text-xs font-medium text-neutral-700">
+                      Full name
+                    </label>
+                    <input
+                      id="reg-name"
+                      type="text"
+                      required
+                      placeholder="e.g. Wanjiru Kamau"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className={LIGHT_INPUT}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="reg-phone" className="text-xs font-medium text-neutral-700">
+                      WhatsApp phone number
+                    </label>
+                    <input
+                      id="reg-phone"
+                      type="tel"
+                      required
+                      placeholder="+254 712 345 678"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className={`${LIGHT_INPUT} font-mono tracking-tight`}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="reg-email" className="text-xs font-medium text-neutral-700">
+                      Email address (optional)
+                    </label>
+                    <input
+                      id="reg-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={LIGHT_INPUT}
+                    />
+                  </div>
+
+                  <label className="flex items-start gap-2.5 text-[11px] text-neutral-500 cursor-pointer py-1 leading-relaxed">
+                    <input
+                      type="checkbox"
+                      checked={consent}
+                      onChange={(e) => setConsent(e.target.checked)}
+                      required
+                      className="mt-0.5 accent-[#111111] rounded"
+                    />
+                    <span>
+                      Send my WhatsApp reminders and private join link for this live session. Reply
+                      STOP anytime.
+                    </span>
+                  </label>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-medium text-sm text-white bg-[#111111] hover:bg-neutral-800 transition active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                  >
+                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Secure My Live Seat on WhatsApp
+                  </button>
+
+                  <div className="flex items-center justify-center gap-1.5 text-[11px] text-neutral-400 font-mono">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#00a884]" />
+                    <span>Official Meta WhatsApp Cloud API</span>
+                  </div>
+                </form>
               )}
-
-              <input
-                type="text"
-                required
-                aria-label="Full name"
-                placeholder="Your full name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className={MUSE_INPUT}
-              />
-
-              <input
-                type="tel"
-                required
-                aria-label="WhatsApp phone number"
-                placeholder="WhatsApp number (+254 712 345 678)"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className={`${MUSE_INPUT} font-mono tracking-tight`}
-              />
-
-              <input
-                type="email"
-                aria-label="Email (optional)"
-                placeholder="Email address (optional backup)"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={MUSE_INPUT}
-              />
-
-              <label className="flex items-start justify-center gap-2 text-[11px] text-[#8a909e] cursor-pointer py-2 px-2 leading-relaxed">
-                <input
-                  type="checkbox"
-                  checked={consent}
-                  onChange={(e) => setConsent(e.target.checked)}
-                  required
-                  className="mt-0.5 accent-[#4589ff] rounded"
-                />
-                <span>
-                  You&apos;ll receive WhatsApp reminders and your private join link for
-                  this live session. Reply STOP anytime.
-                </span>
-              </label>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full font-medium text-[15px] text-white bg-[#4589ff] hover:bg-[#5896ff] transition active:scale-[0.99] disabled:opacity-50"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                Secure My Live Seat on WhatsApp
-              </button>
-            </form>
-          )}
+            </div>
+          </div>
         </div>
       </main>
 
-      <footer className="py-6 text-center text-xs text-[#686e7a]">
+      <footer className="py-5 text-center text-xs text-neutral-500 font-mono">
         Powered by ShowUp · Official Meta WhatsApp Cloud API
       </footer>
     </div>

@@ -46,7 +46,7 @@ Extra people in the room: +${extra}
 ${m.deliveryPct !== null ? `WhatsApp delivery: ${m.deliveryPct}%` + (m.readPct !== null ? ` · read ${m.readPct}%` : "") + "\n" : ""}
 Cost per attendee: ${kes(costNow)} (was ${kes(costBefore)})
 Est. extra sales: ${kes(extraRevenue)} at ${closePct}% close on ${kes(offerPrice)}
-Event pass: ${kes(PASS_COST_KES)} → ~${roiX}x return`;
+Event pass: ${kes(PASS_COST_KES)} -> ~${roiX}x return`;
 
   const copyReport = () => {
     navigator.clipboard.writeText(shareText);
@@ -83,8 +83,8 @@ Event pass: ${kes(PASS_COST_KES)} → ~${roiX}x return`;
         </>
       }
     >
-      <div className="space-y-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="flex flex-col gap-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {inputs.map(([label, value, set]) => (
             <div key={label}>
               <label className={cn(labelCls, "text-[11px] truncate")}>{label}</label>
@@ -99,21 +99,21 @@ Event pass: ${kes(PASS_COST_KES)} → ~${roiX}x return`;
           ))}
         </div>
 
-        <div className="grid sm:grid-cols-3 rounded-md border border-white/[0.08] divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08]">
+        <div className="grid sm:grid-cols-3 rounded-xl border border-neutral-200 divide-y sm:divide-y-0 sm:divide-x divide-neutral-200 bg-white">
           {[
             { l: "Show-up", v: `${m.showupPct}%`, s: `+${extra} vs ${baselinePct}% baseline`, t: "text-[#00a884]" },
-            { l: "Cost / attendee", v: kes(costNow), s: `was ${kes(costBefore)}`, t: "text-white" },
-            { l: "Est. extra sales", v: kes(extraRevenue), s: `~${extraSales.toFixed(1)} sales · ${roiX}x pass`, t: "text-white" },
+            { l: "Cost / attendee", v: kes(costNow), s: `was ${kes(costBefore)}`, t: "text-[#111111]" },
+            { l: "Est. extra sales", v: kes(extraRevenue), s: `~${extraSales.toFixed(1)} sales · ${roiX}x pass`, t: "text-[#111111]" },
           ].map((x) => (
             <div key={x.l} className="px-4 py-3">
-              <div className="text-[11px] uppercase tracking-[0.08em] text-slate-500">{x.l}</div>
-              <div className={cn("mt-1 font-mono tabular-nums text-[20px] font-medium", x.t)}>{x.v}</div>
-              <div className="mt-0.5 text-[11.5px] text-slate-500">{x.s}</div>
+              <div className="text-[11px] uppercase tracking-[0.06em] text-neutral-500">{x.l}</div>
+              <div className={cn("mt-1 font-mono tabular-nums text-[20px] font-semibold", x.t)}>{x.v}</div>
+              <div className="mt-0.5 text-[11.5px] text-neutral-500">{x.s}</div>
             </div>
           ))}
         </div>
 
-        <pre className="text-[12px] leading-relaxed whitespace-pre-wrap font-mono text-slate-300 rounded-md border border-white/[0.08] bg-white/[0.02] p-3.5">
+        <pre className="text-[12px] leading-relaxed whitespace-pre-wrap font-mono text-neutral-700 rounded-xl border border-neutral-200 bg-[#fafafa] p-4">
           {shareText}
         </pre>
       </div>

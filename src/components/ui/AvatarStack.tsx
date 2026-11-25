@@ -25,55 +25,50 @@ const DEFAULT_MEMBERS: AvatarMember[] = [
     niche: "Kilimani Real Estate",
     src: "/tokens/avatar-token.png",
     initials: "WK",
-    accentClass: "from-amber-500/30 to-orange-600/30 text-amber-200",
+    accentClass: "bg-amber-100 text-amber-800",
   },
   {
     name: "Brian O.",
     niche: "Nairobi Forex Floor",
     src: "/tokens/kenya-creator-token.png",
     initials: "BO",
-    accentClass: "from-[#1877f2]/40 to-blue-700/40 text-blue-200",
+    accentClass: "bg-blue-100 text-blue-800",
   },
   {
     name: "Achieng O.",
     niche: "E-Commerce Host",
     initials: "AO",
-    accentClass: "from-[#00a884]/40 to-emerald-700/40 text-emerald-200",
+    accentClass: "bg-emerald-100 text-emerald-800",
   },
   {
     name: "Dr. Kevin M.",
     niche: "Westlands Consulting",
-    src: "/tokens/simba-token.png",
+    src: "/tokens/simba-mascot-token.png",
     initials: "KM",
-    accentClass: "from-purple-500/30 to-indigo-600/30 text-purple-200",
+    accentClass: "bg-neutral-200 text-neutral-800",
   },
 ];
 
-/**
- * ShadcnSpace avatar-08 style overlapping Avatar Stack with hover tooltips,
- * verified WhatsApp status dots, and an overflow counter badge.
- */
 export function AvatarStack({
   members = DEFAULT_MEMBERS,
   overflowCount = 214,
   label = "Trusted by Nairobi webinar hosts",
-  sublabel = "Avg. 18% → 54% live show-up",
+  sublabel = "Avg. 18% to 54% live show-up",
   className = "",
 }: AvatarStackProps) {
   return (
     <div
-      className={`inline-flex flex-wrap items-center justify-center gap-3.5 rounded-2xl border border-white/[0.08] bg-[#12141a]/90 px-4 py-2.5 shadow-lg ${className}`}
+      className={`inline-flex flex-wrap items-center justify-center gap-3.5 rounded-full border border-neutral-200 bg-[#f4f4f4] px-4 py-2 ${className}`}
     >
-      {/* Overlapping Avatar Group (avatar-08) */}
       <div className="flex items-center -space-x-2.5">
         {members.map((m, idx) => (
           <div
             key={m.name}
-            className="group relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-2 ring-[#0d0f12] bg-[#171a22] transition-transform duration-200 hover:-translate-y-1 hover:z-20"
+            className="group relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-2 ring-white bg-white transition-transform duration-200 hover:-translate-y-0.5 hover:z-20"
             style={{ zIndex: members.length - idx }}
           >
             <div
-              className={`h-full w-full rounded-full overflow-hidden border border-white/15 bg-gradient-to-br ${m.accentClass} flex items-center justify-center text-[11px] font-semibold tracking-tight`}
+              className={`h-full w-full rounded-full overflow-hidden border border-neutral-200 ${m.accentClass} flex items-center justify-center text-[11px] font-semibold tracking-tight`}
             >
               {m.src ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -87,36 +82,32 @@ export function AvatarStack({
               )}
             </div>
 
-            {/* Verified WhatsApp Emerald Status Dot */}
             <span
-              className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#00a884] ring-2 ring-[#0d0f12]"
+              className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#00a884] ring-2 ring-white"
               aria-hidden="true"
             />
 
-            {/* Hover Tooltip */}
-            <div className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-[#171a22] px-2.5 py-1 text-[11px] text-white opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+            <div className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-[11px] text-[#111111] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
               <span className="font-semibold">{m.name}</span>
-              <span className="text-slate-400"> · {m.niche}</span>
+              <span className="text-neutral-500"> · {m.niche}</span>
             </div>
           </div>
         ))}
 
-        {/* Overflow Counter Badge (+N) */}
         <div
-          className="relative z-0 inline-flex h-9 min-w-[2.4rem] px-2 items-center justify-center rounded-full ring-2 ring-[#0d0f12] border border-[#1877f2]/40 bg-[#1877f2]/20 font-mono text-[11px] font-bold text-[#60a5fa]"
+          className="relative z-0 inline-flex h-8 min-w-[2.25rem] px-2 items-center justify-center rounded-full ring-2 ring-white bg-[#111111] font-mono text-[10px] font-bold text-white"
           title={`${overflowCount}+ creators using ShowUp`}
         >
           +{overflowCount}
         </div>
       </div>
 
-      {/* Social Proof Copy */}
-      <div className="text-left leading-tight">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-white">
+      <div className="text-left leading-tight pr-1">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-[#111111]">
           <span>{label}</span>
           <CheckCircle2 className="h-3.5 w-3.5 text-[#00a884] shrink-0" />
         </div>
-        <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+        <div className="text-[11px] font-mono text-neutral-500 mt-0.5">
           {sublabel}
         </div>
       </div>

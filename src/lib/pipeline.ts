@@ -164,19 +164,19 @@ export function detectMeetingPlatform(url: string): MeetingPlatformInfo | null {
   const lower = url.toLowerCase().trim();
   if (!lower) return null;
   if (lower.includes("meet.google.com")) {
-    return { name: "Google Meet", badgeColor: "text-emerald-400" };
+    return { name: "Google Meet", badgeColor: "text-emerald-700" };
   }
   if (lower.includes("zoom.us")) {
-    return { name: "Zoom", badgeColor: "text-blue-400" };
+    return { name: "Zoom", badgeColor: "text-blue-700" };
   }
   if (lower.includes("youtube.com") || lower.includes("youtu.be")) {
-    return { name: "YouTube Live", badgeColor: "text-red-400" };
+    return { name: "YouTube Live", badgeColor: "text-red-600" };
   }
   if (lower.includes("teams.microsoft.com") || lower.includes("teams.live.com")) {
-    return { name: "Microsoft Teams", badgeColor: "text-indigo-400" };
+    return { name: "Microsoft Teams", badgeColor: "text-indigo-700" };
   }
   if (lower.includes("webex.com")) {
-    return { name: "Webex", badgeColor: "text-cyan-400" };
+    return { name: "Webex", badgeColor: "text-cyan-700" };
   }
   return null;
 }

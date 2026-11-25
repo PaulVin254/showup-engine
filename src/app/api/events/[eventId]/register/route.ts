@@ -14,10 +14,10 @@ import { ShowUpEvent, ShowUpRegistrant } from "@/lib/types";
 
 export async function POST(
   req: Request,
-  { params }: { params: { eventId: string } }
+  context: { params: Promise<{ eventId: string }> }
 ) {
   try {
-    const { eventId } = params;
+    const { eventId } = await context.params;
     const body = await req.json();
     const {
       fullName,

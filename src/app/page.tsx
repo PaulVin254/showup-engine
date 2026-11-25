@@ -1,20 +1,21 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
+import { Show, UserButton } from "@clerk/nextjs";
 import {
   ArrowRight,
   Calendar,
   Check,
-  Clock,
-  FileSpreadsheet,
+  Menu,
   MessageCircle,
   ShieldCheck,
-  Smartphone,
-  TrendingUp,
   Video,
+  X,
 } from "lucide-react";
-import { BrandWordmark } from "@/components/BrandMark";
+import { MobbinShowcaseFrame } from "@/components/ui/MobbinShowcaseFrame";
+import { TimelineSequence } from "@/components/ui/TimelineSequence";
+import { ShowupComparison } from "@/components/ui/ShowupComparison";
 import { CreatorResults } from "@/components/ui/CreatorResults";
 import { ObjectionFaq } from "@/components/ui/ObjectionFaq";
 import { AvatarStack } from "@/components/ui/AvatarStack";
@@ -24,230 +25,387 @@ import { faqItems, sampleResults } from "@/data/landing";
 const setupHref = "/dashboard?setup=1";
 const sampleHref = "/r/nairobi-real-estate-masterclass";
 
-const touches = [
-  { icon: Check, label: "Seat confirmed", when: "Instantly" },
-  { icon: Calendar, label: "Calendar lock", when: "Right after" },
-  { icon: Clock, label: "24h hook", when: "1 day before" },
-  { icon: MessageCircle, label: "1h alert", when: "1 hour before" },
-  { icon: Video, label: "Direct Zoom link", when: "5 min before" },
-];
-
-const steps = [
-  {
-    n: "01",
-    icon: FileSpreadsheet,
-    title: "Connect your leads",
-    body: "Upload a CSV or plug in Meta Lead Ads. Your registrants land in one place, ready to message.",
-  },
-  {
-    n: "02",
-    icon: Smartphone,
-    title: "Automated 5-touch WhatsApp in EAT",
-    body: "Every registrant gets a timed countdown on the official Meta WhatsApp Cloud API, in East Africa Time.",
-  },
-  {
-    n: "03",
-    icon: TrendingUp,
-    title: "Double your room on M-Pesa",
-    body: "Watch 50–60% show up live. You pay KES 1,500 by M-Pesa only when you launch.",
-  },
-];
-
-const resultsToShow = sampleResults.filter(
-  (r) => r.niche === "real-estate" || r.niche === "consulting"
-);
-
-function PrimaryCta({ id, label = "Create your webinar free" }: { id?: string; label?: string }) {
+function InlineWhatsAppSquircle() {
   return (
-    <Link
-      id={id}
-      href={setupHref}
-      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1877f2] hover:bg-[#166fe5] text-white font-semibold text-sm sm:text-base px-7 py-3.5 transition shadow-[0_4px_18px_rgba(24,119,242,0.4)]"
+    <span
+      aria-hidden="true"
+      className="inline-flex items-center justify-center align-middle mx-1 sm:mx-2 -mt-1.5 w-9 h-9 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-[12px] sm:rounded-[16px] bg-gradient-to-br from-[#25D366] via-[#00a884] to-[#075E54] text-white shadow-[0_10px_24px_-6px_rgba(0,168,132,0.55),inset_0_1px_1px_rgba(255,255,255,0.45)] rotate-[-3deg] select-none"
     >
-      {label}
-      <ArrowRight className="w-4 h-4" />
-    </Link>
+      <MessageCircle className="w-5 h-5 sm:w-7 sm:h-7 fill-white/15 stroke-[2.2]" />
+    </span>
+  );
+}
+
+function InlineCalendarSquircle() {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex items-center justify-center align-middle mx-1 sm:mx-2 -mt-1.5 w-9 h-9 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-[12px] sm:rounded-[16px] bg-gradient-to-br from-[#a3e635] via-[#84cc16] to-[#4d7c0f] text-[#111111] shadow-[0_10px_24px_-6px_rgba(132,204,22,0.55),inset_0_1px_1px_rgba(255,255,255,0.65)] rotate-[3deg] select-none"
+    >
+      <Calendar className="w-5 h-5 sm:w-7 sm:h-7 stroke-[2.3]" />
+    </span>
+  );
+}
+
+function InlineSphereSquircle() {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex items-center justify-center align-middle mx-1 sm:mx-2 -mt-1.5 w-9 h-9 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-[12px] sm:rounded-[16px] bg-gradient-to-br from-[#27272a] via-[#111111] to-[#000000] text-white shadow-[0_12px_26px_-6px_rgba(0,0,0,0.45),inset_0_1px_2px_rgba(255,255,255,0.35)] rotate-[-2deg] select-none"
+    >
+      <Video className="w-5 h-5 sm:w-7 sm:h-7 stroke-[2.1]" />
+    </span>
   );
 }
 
 export default function LandingPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <div className="min-h-screen bg-[#0d0f12] text-slate-100 antialiased selection:bg-[#1877f2] selection:text-white overflow-x-hidden">
-      {/* Header */}
-      <header className="w-full px-4 sm:px-10 py-4 flex items-center justify-between border-b border-white/[0.08]">
-        <Link href="/" aria-label="ShowUp Home">
-          <BrandWordmark />
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link
-            href={sampleHref}
-            className="hidden sm:inline text-xs text-slate-400 hover:text-white transition"
-          >
-            Sample page
-          </Link>
-          <Link
-            href={setupHref}
-            className="inline-flex items-center rounded-xl bg-[#1877f2] hover:bg-[#166fe5] text-white font-semibold text-xs px-4 py-2 transition"
-          >
-            Create free
-          </Link>
-        </div>
-      </header>
+    <div className="min-h-screen bg-white text-[#111111] antialiased selection:bg-[#111111] selection:text-white overflow-x-hidden">
+      {/* Minimal Mobbin-Style Header */}
+      <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-neutral-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-8">
+            <Link
+              href="/"
+              aria-label="ShowUp Home"
+              className="flex items-center gap-2.5 shrink-0"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#111111] text-white font-bold text-sm tracking-tight">
+                S
+              </span>
+              <span className="text-[16px] font-semibold tracking-tight text-[#111111]">
+                ShowUp
+              </span>
+            </Link>
 
-      {/* Hero */}
-      <section className="pt-14 sm:pt-24 pb-20 px-4 sm:px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-4xl sm:text-6xl font-semibold tracking-[-0.03em] leading-[1.1] text-white">
-            Your Facebook leads check WhatsApp,{" "}
-            <span className="font-serif italic font-normal text-[#1877f2]">not email</span>
-          </h1>
-          <p className="mt-5 sm:mt-6 text-base sm:text-lg text-slate-400 leading-relaxed max-w-2xl mx-auto">
-            Automated WhatsApp reminders in East Africa Time take live show-up
-            from ~18% to 50–60%. Set up in 3 minutes.
-          </p>
+            <nav className="hidden md:flex items-center gap-6 text-[13px] font-medium text-neutral-600">
+              <a
+                href="#sequence"
+                className="hover:text-[#111111] transition-colors"
+              >
+                Sequence
+              </a>
+              <a
+                href="#calculator"
+                className="hover:text-[#111111] transition-colors"
+              >
+                Calculator
+              </a>
+              <a
+                href="#customers"
+                className="hover:text-[#111111] transition-colors"
+              >
+                Customers
+              </a>
+              <a
+                href="#pricing"
+                className="hover:text-[#111111] transition-colors"
+              >
+                Pricing
+              </a>
+            </nav>
+          </div>
 
-          <div className="mt-9 flex flex-col items-center gap-3">
-            <PrimaryCta id="hero-cta" />
-            <p className="text-xs text-slate-500 font-mono">
-              Free to build · Pay KES 1,500 by M-Pesa only when you launch
-            </p>
+          <div className="hidden md:flex items-center gap-3 text-[13px] font-medium">
             <Link
               href={sampleHref}
-              className="text-sm text-slate-400 hover:text-white underline underline-offset-4 decoration-white/20 transition"
+              className="text-neutral-600 hover:text-[#111111] px-3 py-1.5 transition-colors"
             >
-              See sample registration page
+              Sample room
             </Link>
-          </div>
-
-          <div className="mt-10 flex justify-center">
-            <AvatarStack />
-          </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how" className="py-20 border-t border-white/[0.08] px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12 space-y-3">
-            <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
-              Three steps to a fuller room
-            </h2>
-            <p className="text-sm text-slate-400">
-              No new tools to learn. Your leads in, a packed webinar out.
-            </p>
-          </div>
-
-          <ol className="grid gap-4 md:grid-cols-3">
-            {steps.map((s) => (
-              <li
-                key={s.n}
-                className="rounded-2xl border border-white/[0.08] bg-[#12141a] p-6 text-left flex flex-col gap-4"
+            <Show when="signed-out">
+              <Link
+                href="/sign-in"
+                className="text-neutral-700 hover:text-[#111111] px-3 py-1.5 transition-colors"
               >
-                <div className="flex items-center justify-between">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#00a884]/25 bg-[#00a884]/10">
-                    <s.icon className="w-5 h-5 text-[#00a884]" />
-                  </span>
-                  <span className="font-mono text-xs text-slate-500">{s.n}</span>
-                </div>
-                <h3 className="text-lg font-semibold text-white tracking-tight">{s.title}</h3>
-                <p className="text-sm text-slate-400 leading-relaxed">{s.body}</p>
+                Log in
+              </Link>
+              <Link
+                href="/sign-up"
+                className="inline-flex items-center rounded-full bg-[#111111] hover:bg-neutral-800 text-white px-4 py-2 text-[13px] font-medium transition"
+              >
+                Start for free
+              </Link>
+            </Show>
+            <Show when="signed-in">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center rounded-full bg-[#111111] hover:bg-neutral-800 text-white px-4 py-2 text-[13px] font-medium transition"
+              >
+                Dashboard
+              </Link>
+              <UserButton />
+            </Show>
+          </div>
 
-                {s.n === "02" && (
-                  <ul className="mt-1 space-y-2 border-t border-white/[0.06] pt-4">
-                    {touches.map((t, i) => (
-                      <li key={t.label} className="flex items-center gap-2.5 text-xs">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00a884]/15 text-[#00a884] font-mono text-[10px]">
-                          {i + 1}
-                        </span>
-                        <span className="text-slate-200">{t.label}</span>
-                        <span className="ml-auto font-mono text-[11px] text-slate-500">
-                          {t.when}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ol>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            className="md:hidden p-2 rounded-full border border-neutral-200 text-[#111111]"
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+          >
+            {mobileMenuOpen ? (
+              <X className="w-5 h-5" />
+            ) : (
+              <Menu className="w-5 h-5" />
+            )}
+          </button>
+        </div>
+
+        {/* Mobile Nav Drawer */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-neutral-100 bg-white px-4 py-4 flex flex-col gap-3 text-sm font-medium text-[#111111]">
+            <a href="#sequence" onClick={() => setMobileMenuOpen(false)}>
+              Sequence
+            </a>
+            <a href="#calculator" onClick={() => setMobileMenuOpen(false)}>
+              Calculator
+            </a>
+            <a href="#customers" onClick={() => setMobileMenuOpen(false)}>
+              Customers
+            </a>
+            <a href="#pricing" onClick={() => setMobileMenuOpen(false)}>
+              Pricing
+            </a>
+            <Link href={sampleHref} onClick={() => setMobileMenuOpen(false)}>
+              Sample room
+            </Link>
+            <Show when="signed-out">
+              <Link href="/sign-in" onClick={() => setMobileMenuOpen(false)}>
+                Log in
+              </Link>
+              <Link
+                href="/sign-up"
+                onClick={() => setMobileMenuOpen(false)}
+                className="mt-1 inline-flex items-center justify-center rounded-full bg-[#111111] text-white py-2.5 text-sm font-medium"
+              >
+                Start for free
+              </Link>
+            </Show>
+            <Show when="signed-in">
+              <Link
+                href="/dashboard"
+                onClick={() => setMobileMenuOpen(false)}
+                className="mt-1 inline-flex items-center justify-center rounded-full bg-[#111111] text-white py-2.5 text-sm font-medium"
+              >
+                Dashboard
+              </Link>
+            </Show>
+          </div>
+        )}
+      </header>
+
+      {/* Mobbin-Style Centered Hero */}
+      <section className="pt-14 sm:pt-20 pb-10 px-4 sm:px-6 text-center">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-4xl sm:text-6xl md:text-[68px] font-semibold tracking-[-0.04em] leading-[1.06] text-[#111111]">
+            Where <InlineWhatsAppSquircle /> hosts
+            <br className="hidden sm:block" /> and creators{" "}
+            <InlineCalendarSquircle /> fill
+            <br className="hidden sm:block" /> webinars <InlineSphereSquircle />{" "}
+            that convert.
+          </h1>
+
+          <p className="mt-6 text-sm sm:text-lg text-neutral-500 max-w-xl mx-auto leading-relaxed font-normal">
+            The WhatsApp attendance engine for webinars and online classes.
+            Automated 5-touch EAT reminders that lift live show-up from 18% to
+            54%.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              id="hero-cta"
+              href={setupHref}
+              className="inline-flex items-center justify-center rounded-full bg-[#111111] hover:bg-neutral-800 text-white font-medium text-sm px-6 py-3 transition active:scale-[0.98]"
+            >
+              Start for free
+            </Link>
+            <a
+              href="#pricing"
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#f3f3f3] hover:bg-neutral-200/80 text-[#111111] font-medium text-sm px-6 py-3 transition active:scale-[0.98]"
+            >
+              <span>See launch pass</span>
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
         </div>
       </section>
 
-      {/* Social proof */}
-      <section id="results" className="py-20 border-t border-white/[0.08]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center space-y-3 mb-10">
-          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
-            From 18% to 54% in the room
+      {/* Centerpiece Recessed Mobbin Showcase Frame */}
+      <section className="pb-14">
+        <MobbinShowcaseFrame />
+
+        {/* Platform Ecosystem Strip + Creator Avatar Proof */}
+        <div className="max-w-5xl mx-auto px-4 mt-12 text-center flex flex-col items-center gap-6">
+          <p className="text-xs text-neutral-400 font-medium">
+            Built for webinar hosts running on
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-neutral-400 font-semibold text-sm sm:text-base tracking-tight">
+            <span>Meta Cloud API</span>
+            <span>Zoom</span>
+            <span>Google Meet</span>
+            <span>YouTube Live</span>
+            <span>Safaricom M-Pesa</span>
+          </div>
+          <AvatarStack className="mt-2" />
+        </div>
+      </section>
+
+      {/* Interactive 5-Touch Sequence Section */}
+      <section
+        id="sequence"
+        className="py-16 sm:py-24 border-t border-neutral-100 px-4 sm:px-6 bg-white"
+      >
+        <div className="max-w-3xl mx-auto text-center flex flex-col gap-3 mb-12">
+          <h2 className="text-3xl sm:text-5xl font-semibold tracking-[-0.03em] text-[#111111]">
+            Five timed touches in East Africa Time
           </h2>
-          <p className="text-sm text-slate-400">
-            Illustrative sample results from Nairobi real estate and consulting webinars.
+          <p className="text-sm sm:text-base text-neutral-500 max-w-xl mx-auto leading-relaxed">
+            Every registrant is queued automatically via official Meta WhatsApp
+            Cloud API templates, from instant booking to the 5-minute join ping.
           </p>
         </div>
-        <div className="px-4 sm:px-6">
-          <CreatorResults
-            results={resultsToShow}
-            showFilters={false}
-            ctaHref="#pricing"
-            ctaLabel="See the launch pass"
-          />
+        <TimelineSequence />
+      </section>
+
+      {/* Interactive Live Room Calculator */}
+      <section
+        id="calculator"
+        className="py-16 sm:py-24 border-t border-neutral-100 px-4 sm:px-6 bg-[#fafafa]"
+      >
+        <div className="max-w-3xl mx-auto text-center flex flex-col gap-3 mb-12">
+          <h2 className="text-3xl sm:text-5xl font-semibold tracking-[-0.03em] text-[#111111]">
+            See how many extra seats you fill
+          </h2>
+          <p className="text-sm sm:text-base text-neutral-500 max-w-xl mx-auto leading-relaxed">
+            Drag the slider to compare standard email reminders (~18% live
+            attendance) against ShowUp&apos;s 5-touch WhatsApp engine (54%).
+          </p>
         </div>
+        <ShowupComparison />
+      </section>
+
+      {/* Creator Results Showcase */}
+      <section
+        id="customers"
+        className="py-16 sm:py-24 border-t border-neutral-100 px-4 sm:px-6 bg-white"
+      >
+        <div className="max-w-3xl mx-auto text-center flex flex-col gap-3 mb-10">
+          <h2 className="text-3xl sm:text-5xl font-semibold tracking-[-0.03em] text-[#111111]">
+            From 18% to 54% in the room
+          </h2>
+          <p className="text-sm sm:text-base text-neutral-500">
+            Illustrative sample results across Nairobi real estate, finance,
+            e-commerce, and consulting webinars.
+          </p>
+        </div>
+        <CreatorResults
+          results={sampleResults}
+          showFilters={true}
+          ctaHref={setupHref}
+          ctaLabel="Start building for free"
+        />
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-20 border-t border-white/[0.08]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10 space-y-3">
-            <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
+      <section
+        id="pricing"
+        className="py-16 sm:py-24 border-t border-neutral-100 px-4 sm:px-6 bg-[#fafafa]"
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12 flex flex-col gap-3">
+            <h2 className="text-3xl sm:text-5xl font-semibold tracking-[-0.03em] text-[#111111]">
               Pay per webinar. Zero monthly lock-in.
             </h2>
-            <p className="text-sm text-slate-400">
-              Build your room, test the sequence and connect your leads for free.
+            <p className="text-sm sm:text-base text-neutral-500">
+              Build your registration page, test the WhatsApp sequence, and
+              import leads free. Pay only when you launch.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/[0.08] bg-[#12141a] p-6 sm:p-9 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8">
-            <div className="space-y-4 max-w-md text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00a884]/10 border border-[#00a884]/25 text-[#00a884] text-xs font-medium">
-                <ShieldCheck className="w-4 h-4" />
-                30% Show-Up Guarantee or M-Pesa Refund
-              </div>
-              <h3 className="text-2xl font-semibold text-white tracking-tight">
-                Single Webinar Launch Pass
-              </h3>
-              <ul className="space-y-2 text-sm text-slate-300">
-                {[
-                  "All 5 automated WhatsApp reminders in East Africa Time",
-                  "Hosted registration page + CSV upload + Meta Lead Ads",
-                  "Up to 200 registrants included",
-                  "No monthly lock-in. Pay by M-Pesa STK push",
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2.5">
-                    <Check className="w-4 h-4 text-[#00a884] shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="w-full sm:w-auto sm:text-right shrink-0 space-y-4 p-6 rounded-2xl bg-[#0d0f12] border border-white/[0.08]">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+            {/* Free Sandbox Card */}
+            <div className="md:col-span-5 rounded-[24px] border border-neutral-200 bg-white p-7 flex flex-col justify-between gap-6 text-left">
               <div>
-                <div className="text-xs text-slate-400 font-mono">One-time launch pass</div>
-                <div className="font-mono tracking-tight text-4xl font-bold text-white mt-1">
-                  KES 1,500
+                <div className="text-xs font-mono text-neutral-500">
+                  Builder Sandbox
                 </div>
-                <div className="text-[11px] text-[#00a884] font-mono mt-0.5">
-                  per webinar via M-Pesa STK
+                <div className="text-3xl font-bold font-mono text-[#111111] mt-2">
+                  KES 0
                 </div>
+                <p className="text-sm text-neutral-500 mt-2 leading-relaxed">
+                  Set up your event page, customize templates, and test live
+                  delivery to your own WhatsApp before paying a shilling.
+                </p>
+                <ul className="mt-6 flex flex-col gap-2.5 text-sm text-neutral-700">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-neutral-400 shrink-0" />
+                    <span>Hosted /r/ registration page</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-neutral-400 shrink-0" />
+                    <span>CSV &amp; Meta Lead Ads preview</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-neutral-400 shrink-0" />
+                    <span>Live WhatsApp test ping</span>
+                  </li>
+                </ul>
               </div>
+
               <Link
                 href={setupHref}
-                className="w-full py-3 px-6 rounded-xl bg-[#1877f2] hover:bg-[#166fe5] text-white font-semibold text-sm transition flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(24,119,242,0.35)]"
+                className="w-full py-3 px-5 rounded-full bg-[#f3f3f3] hover:bg-neutral-200 text-[#111111] text-sm font-medium text-center transition"
               >
-                Create your webinar free
-                <ArrowRight className="w-4 h-4" />
+                Try builder free
               </Link>
-              <div className="text-[11px] text-slate-400 text-center font-mono">
-                Free until you press launch
+            </div>
+
+            {/* Single Webinar Launch Pass Card */}
+            <div className="md:col-span-7 rounded-[24px] border-2 border-[#111111] bg-white p-7 sm:p-8 flex flex-col justify-between gap-6 text-left shadow-[0_24px_60px_-25px_rgba(0,0,0,0.14)]">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+                  <ShieldCheck className="w-4 h-4" />
+                  30% Show-Up Guarantee or M-Pesa Refund
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-2xl font-semibold text-[#111111] tracking-tight">
+                    Single Webinar Launch Pass
+                  </h3>
+                  <div className="font-mono text-3xl font-bold text-[#111111]">
+                    KES 1,500
+                  </div>
+                </div>
+
+                <ul className="mt-6 flex flex-col gap-3 text-sm text-neutral-700">
+                  {[
+                    "All 5 automated WhatsApp reminders in East Africa Time",
+                    "Hosted registration page + CSV upload + Meta Lead Ads sync",
+                    "Up to 200 registrants included with tracked /j/ shortlinks",
+                    "No monthly subscription. Pay by M-Pesa STK push only when launching",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2.5">
+                      <Check className="w-4 h-4 text-[#00a884] shrink-0 mt-0.5" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-neutral-100">
+                <span className="text-xs font-mono text-neutral-500">
+                  One-time M-Pesa STK pass · Free until launch
+                </span>
+                <Link
+                  href={setupHref}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#111111] hover:bg-neutral-800 text-white font-medium text-sm px-6 py-3 transition shrink-0"
+                >
+                  Create your webinar free
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
             </div>
           </div>
@@ -255,44 +413,78 @@ export default function LandingPage() {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="py-20 border-t border-white/[0.08]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center mb-10">
-          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
+      <section
+        id="faq"
+        className="py-16 sm:py-24 border-t border-neutral-100 px-4 sm:px-6 bg-white"
+      >
+        <div className="max-w-3xl mx-auto text-center mb-10">
+          <h2 className="text-3xl sm:text-5xl font-semibold tracking-[-0.03em] text-[#111111]">
             Questions Kenyan hosts ask first
           </h2>
         </div>
-        <div className="px-4 sm:px-6">
-          <ObjectionFaq items={faqItems} defaultOpenId="mpesa" />
+        <ObjectionFaq items={faqItems} defaultOpenId="mpesa" />
+      </section>
+
+      {/* Final Minimal CTA */}
+      <section className="py-16 sm:py-20 border-t border-neutral-100 px-4 text-center bg-[#fafafa]">
+        <div className="max-w-2xl mx-auto flex flex-col items-center gap-5">
+          <h2 className="text-3xl sm:text-4xl font-semibold tracking-[-0.03em] text-[#111111]">
+            Fill your next webinar room
+          </h2>
+          <p className="text-sm text-neutral-500">
+            Stop losing 82% of your Meta ad leads to unread Gmail tabs.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href={setupHref}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#111111] hover:bg-neutral-800 text-white font-medium text-sm px-6 py-3 transition"
+            >
+              Start for free
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href={sampleHref}
+              className="inline-flex items-center justify-center rounded-full bg-white border border-neutral-200 hover:bg-neutral-100 text-[#111111] font-medium text-sm px-6 py-3 transition"
+            >
+              View sample page
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="py-20 border-t border-white/[0.08] px-4 text-center space-y-6">
-        <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
-          Fill your next webinar room
-        </h2>
-        <PrimaryCta />
-      </section>
-
-      {/* Footer */}
-      <footer className="py-10 pb-24 sm:pb-10 border-t border-white/[0.08] text-center text-xs text-slate-500 font-mono space-y-2">
-        <div>ShowUp Engine · Built for Kenya &amp; Africa · Official Meta WhatsApp Cloud API</div>
-        <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400">
-          <Link href="/privacy" className="hover:text-white transition">
-            Privacy Policy
-          </Link>
-          <span>·</span>
-          <Link href="/terms" className="hover:text-white transition">
-            Terms of Service
-          </Link>
-          <span>·</span>
-          <Link href="/data-deletion" className="hover:text-white transition">
-            Data Deletion
-          </Link>
+      {/* Clean Minimal Footer */}
+      <footer className="py-10 pb-24 sm:pb-10 border-t border-neutral-200/80 bg-white text-center text-xs text-neutral-500 font-mono">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span>
+            ShowUp Engine · Built for Kenya &amp; Africa · Official Meta
+            WhatsApp Cloud API
+          </span>
+          <div className="flex items-center justify-center gap-4 text-[11px] text-neutral-500">
+            <Link
+              href="/privacy"
+              className="hover:text-[#111111] transition-colors"
+            >
+              Privacy Policy
+            </Link>
+            <span>·</span>
+            <Link
+              href="/terms"
+              className="hover:text-[#111111] transition-colors"
+            >
+              Terms of Service
+            </Link>
+            <span>·</span>
+            <Link
+              href="/data-deletion"
+              className="hover:text-[#111111] transition-colors"
+            >
+              Data Deletion
+            </Link>
+          </div>
         </div>
       </footer>
 
-      <StickyMobileCta href={setupHref} targetId="hero-cta" />
+      <StickyMobileCta href={setupHref} targetId="hero-cta" label="Start for free" />
     </div>
   );
 }

@@ -12,6 +12,7 @@ export type SenderMode = "shared_showup" | "own_waba";
 export interface ShowUpTenant {
   id: string;
   owner_user_id?: string | null;
+  clerk_user_id?: string | null;
   business_name: string;
   email?: string | null;
   phone_e164?: string | null;

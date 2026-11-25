@@ -2,6 +2,11 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import {
+  DEFAULT_WEBINAR_TEMPLATES,
+  buildExampleValuesForBody,
+  seedSystemTemplatesForTenant,
+} from "@/lib/default-templates";
+import {
   checkSupabaseMigrationStatus,
   getActiveTenant,
   readLocalDb,
@@ -10,6 +15,42 @@ import {
 } from "@/lib/store";
 import { createCustomMetaTemplate, fetchMetaWabaTemplates } from "@/lib/whatsapp-api";
 import { SequenceStage, ShowUpTemplate } from "@/lib/types";
+
+interface MetaRemoteTemplate {
+  id: string;
+  name: string;
+  status: string;
+  category?: string;
+  language?: string;
+  components?: Array<{ type: string; text?: string }>;
+}
+
+function mapMetaStatus(raw: string): "APPROVED" | "PENDING" | "REJECTED" {
+  if (raw === "APPROVED") return "APPROVED";
+  if (raw === "REJECTED") return "REJECTED";
+  return "PENDING";
+}
+
+function buildRemoteTemplateInsert(tenantId: string, remote: MetaRemoteTemplate, bodyText: string): ShowUpTemplate {
+  const defaultMatch = DEFAULT_WEBINAR_TEMPLATES.find((d) => d.name === remote.name);
+  return {
+    id: crypto.randomUUID(),
+    tenant_id: tenantId,
+    meta_template_id: remote.id,
+    name: remote.name,
+    category: remote.category === "MARKETING" ? "MARKETING" : "UTILITY",
+    language: remote.language || "en",
+    status: mapMetaStatus(remote.status),
+    stage_default: defaultMatch?.stage ?? "custom",
+    body_text: bodyText,
+    button_type: defaultMatch?.button_type ?? "NONE",
+    button_text: defaultMatch?.button_text ?? null,
+    button_url_pattern: defaultMatch?.button_url_pattern ?? null,
+    variables_schema: defaultMatch?.variables_schema ?? [],
+    is_system_default: Boolean(defaultMatch),
+    created_at: new Date().toISOString(),
+  };
+}
 
 export async function GET() {
   try {
@@ -21,70 +62,134 @@ export async function GET() {
       );
     }
     const supabaseReady = await checkSupabaseMigrationStatus();
-
-    // If tenant has a live WABA token, sync status from Meta Graph API
-    if (
+    const hasLiveWaba = Boolean(
       tenant.waba_id &&
-      tenant.access_token &&
-      !tenant.access_token.startsWith("demo_")
-    ) {
+        tenant.access_token &&
+        !tenant.access_token.startsWith("demo_")
+    );
+
+    let syncedFromMeta = false;
+    let syncError: string | undefined;
+
+    if (supabaseReady && supabase) {
+      // Ensure tenant has system templates seeded before syncing Meta statuses
+      const { data: existingRows } = await supabase
+        .from("showup_templates")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .order("created_at", { ascending: true });
+
+      let currentRows = (existingRows || []) as ShowUpTemplate[];
+      if (currentRows.length === 0) {
+        const defaults = seedSystemTemplatesForTenant(tenant.id).map(
+          ({ id: _unused, ...rest }) => rest
+        );
+        await supabase
+          .from("showup_templates")
+          .upsert(defaults, { onConflict: "tenant_id,name,language" });
+
+        const { data: seeded } = await supabase
+          .from("showup_templates")
+          .select("*")
+          .eq("tenant_id", tenant.id)
+          .order("created_at", { ascending: true });
+        currentRows = (seeded || []) as ShowUpTemplate[];
+      }
+
+      if (hasLiveWaba && tenant.waba_id && tenant.access_token) {
+        try {
+          const metaTemplates = (await fetchMetaWabaTemplates(
+            tenant.waba_id,
+            tenant.access_token
+          )) as MetaRemoteTemplate[];
+
+          for (const remote of metaTemplates) {
+            const mappedStatus = mapMetaStatus(remote.status);
+            const lang = remote.language || "en";
+            const existing = currentRows.find(
+              (t) => t.name === remote.name && t.language === lang
+            ) || currentRows.find((t) => t.name === remote.name);
+
+            if (existing) {
+              await supabase
+                .from("showup_templates")
+                .update({
+                  status: mappedStatus,
+                  meta_template_id: remote.id,
+                })
+                .eq("id", existing.id);
+            } else {
+              const bodyComp = remote.components?.find((c) => c.type === "BODY");
+              if (bodyComp?.text) {
+                const newRow = buildRemoteTemplateInsert(tenant.id, remote, bodyComp.text);
+                await supabase
+                  .from("showup_templates")
+                  .upsert(newRow, { onConflict: "tenant_id,name,language" });
+              }
+            }
+          }
+          syncedFromMeta = true;
+        } catch (err) {
+          syncError = err instanceof Error ? err.message : "Could not sync from Meta";
+          console.warn("Could not sync live WABA templates to Supabase:", err);
+        }
+      }
+
+      const { data: refreshed } = await supabase
+        .from("showup_templates")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .order("created_at", { ascending: true });
+
+      return NextResponse.json({
+        templates: refreshed || currentRows,
+        syncedFromMeta,
+        wabaConnected: hasLiveWaba,
+        ...(syncError ? { syncError } : {}),
+      });
+    }
+
+    const db = readLocalDb();
+    if (!db.templates.some((t) => t.tenant_id === tenant.id)) {
+      db.templates.push(...seedSystemTemplatesForTenant(tenant.id));
+      writeLocalDb(db);
+    }
+
+    if (hasLiveWaba && tenant.waba_id && tenant.access_token) {
       try {
-        const metaTemplates = await fetchMetaWabaTemplates(
+        const metaTemplates = (await fetchMetaWabaTemplates(
           tenant.waba_id,
           tenant.access_token
-        );
+        )) as MetaRemoteTemplate[];
 
-        const db = readLocalDb();
         for (const remote of metaTemplates) {
-          const bodyComp = remote.components?.find(
-            (c: { type: string }) => c.type === "BODY"
+          const bodyComp = remote.components?.find((c) => c.type === "BODY");
+          const existingIdx = db.templates.findIndex(
+            (t) => t.tenant_id === tenant.id && t.name === remote.name
           );
-          const existingIdx = db.templates.findIndex((t) => t.name === remote.name);
-          const mappedStatus: "APPROVED" | "PENDING" | "REJECTED" =
-            remote.status === "APPROVED"
-              ? "APPROVED"
-              : remote.status === "REJECTED"
-                ? "REJECTED"
-                : "PENDING";
+          const mappedStatus = mapMetaStatus(remote.status);
 
           if (existingIdx >= 0) {
             db.templates[existingIdx].status = mappedStatus;
             db.templates[existingIdx].meta_template_id = remote.id;
           } else if (bodyComp?.text) {
-            db.templates.push({
-              id: `tpl-meta-${remote.id}`,
-              tenant_id: tenant.id,
-              meta_template_id: remote.id,
-              name: remote.name,
-              category: remote.category === "MARKETING" ? "MARKETING" : "UTILITY",
-              language: remote.language || "en",
-              status: mappedStatus,
-              stage_default: "custom",
-              body_text: bodyComp.text,
-              button_type: "NONE",
-              variables_schema: [],
-              is_system_default: false,
-              created_at: new Date().toISOString(),
-            });
+            db.templates.push(buildRemoteTemplateInsert(tenant.id, remote, bodyComp.text));
           }
         }
         writeLocalDb(db);
-      } catch (syncErr) {
-        console.warn("Could not sync live WABA templates, returning cached list:", syncErr);
+        syncedFromMeta = true;
+      } catch (err) {
+        syncError = err instanceof Error ? err.message : "Could not sync from Meta";
+        console.warn("Could not sync live WABA templates, returning cached list:", err);
       }
     }
 
-    if (supabaseReady && supabase) {
-      const { data } = await supabase
-        .from("showup_templates")
-        .select("*")
-        .eq("tenant_id", tenant.id)
-        .order("created_at", { ascending: true });
-      return NextResponse.json({ templates: data || [] });
-    }
-
-    const db = readLocalDb();
-    return NextResponse.json({ templates: db.templates });
+    return NextResponse.json({
+      templates: db.templates.filter((t) => t.tenant_id === tenant.id),
+      syncedFromMeta,
+      wabaConnected: hasLiveWaba,
+      ...(syncError ? { syncError } : {}),
+    });
   } catch (err: unknown) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed loading templates" },
@@ -127,8 +232,13 @@ export async function POST(req: Request) {
       .replace(/[^a-z0-9_]/g, "_")
       .replace(/_+/g, "_");
 
+    const normalizedExamples = buildExampleValuesForBody(
+      String(bodyText),
+      Array.isArray(exampleValues) ? exampleValues.map(String) : undefined
+    );
+
     let metaId = `local_${Date.now()}`;
-    let status: "APPROVED" | "PENDING" | "REJECTED" = "APPROVED";
+    let status: "APPROVED" | "PENDING" | "REJECTED" = "PENDING";
 
     // Submit to live Meta WABA if connected with real credentials
     if (
@@ -143,7 +253,7 @@ export async function POST(req: Request) {
         category,
         language,
         bodyText,
-        exampleValues,
+        exampleValues: normalizedExamples,
       });
       metaId = metaCreated.id;
       status = metaCreated.status;
@@ -179,7 +289,14 @@ export async function POST(req: Request) {
     }
 
     const db = readLocalDb();
-    db.templates.push(newTemplate);
+    const existingIdx = db.templates.findIndex(
+      (t) => t.tenant_id === tenant.id && t.name === cleanName && t.language === language
+    );
+    if (existingIdx >= 0) {
+      db.templates[existingIdx] = newTemplate;
+    } else {
+      db.templates.push(newTemplate);
+    }
     writeLocalDb(db);
 
     return NextResponse.json({ template: newTemplate, submittedToMeta: metaId });
@@ -190,4 +307,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

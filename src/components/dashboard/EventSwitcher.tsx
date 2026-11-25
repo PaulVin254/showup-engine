@@ -7,7 +7,6 @@ import {
   ChevronsUpDown,
   Plus,
   Search,
-  Sparkles,
   Trash2,
   Calendar,
   Users,
@@ -42,7 +41,6 @@ export function EventSwitcher({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -55,7 +53,6 @@ export function EventSwitcher({
     }
   }, [open]);
 
-  // Focus search input when open
   useEffect(() => {
     if (open && events.length > 4) {
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -64,7 +61,6 @@ export function EventSwitcher({
     }
   }, [open, events.length]);
 
-  // Close on escape
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && open) {
@@ -75,7 +71,6 @@ export function EventSwitcher({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open]);
 
-  // Map registrant counts by eventId
   const regCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of registrants) {
@@ -98,38 +93,35 @@ export function EventSwitcher({
 
   return (
     <div ref={containerRef} className="relative inline-block text-left">
-      {/* Trigger Button */}
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          "group flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[13px] font-medium transition select-none",
+          "group flex items-center gap-2 px-3 py-1.5 rounded-full border text-[13px] font-medium transition select-none",
           open
-            ? "bg-white/[0.08] border-white/[0.2] text-white shadow-sm"
-            : "bg-white/[0.04] border-white/[0.08] text-slate-200 hover:text-white hover:border-white/[0.15] hover:bg-white/[0.06]"
+            ? "bg-neutral-200/80 border-neutral-300 text-[#111111]"
+            : "bg-[#f4f4f5] border-neutral-200 text-[#111111] hover:bg-neutral-200/70"
         )}
       >
-        {/* Status Dot */}
         {activeEvent && (
           <span
             className={cn(
               "w-2 h-2 rounded-full shrink-0",
-              activeLifecycle === "live" && "bg-emerald-400 animate-pulse",
-              activeLifecycle === "scheduled" && "bg-blue-400",
-              activeLifecycle === "finished" && "bg-slate-500",
-              activeLifecycle === "zero" && "bg-amber-400"
+              activeLifecycle === "live" && "bg-[#00a884] animate-pulse",
+              activeLifecycle === "scheduled" && "bg-[#1877f2]",
+              activeLifecycle === "finished" && "bg-neutral-400",
+              activeLifecycle === "zero" && "bg-amber-500"
             )}
           />
         )}
 
         <span className="max-w-[150px] sm:max-w-[220px] md:max-w-[280px] truncate text-left">
-          {activeEvent?.title || "Select webinar…"}
+          {activeEvent?.title || "Select webinar..."}
         </span>
 
-        <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-200 shrink-0 ml-0.5" />
+        <ChevronsUpDown className="w-3.5 h-3.5 text-neutral-500 group-hover:text-[#111111] shrink-0 ml-0.5" />
       </button>
 
-      {/* Dropdown Popover */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -137,36 +129,34 @@ export function EventSwitcher({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.12, ease: "easeOut" }}
-            className="absolute left-0 top-full mt-1.5 z-50 w-[300px] sm:w-[360px] rounded-xl bg-[#13161c] border border-white/[0.1] shadow-2xl backdrop-blur-xl overflow-hidden flex flex-col"
+            className="absolute left-0 top-full mt-1.5 z-50 w-[300px] sm:w-[360px] rounded-2xl bg-white border border-neutral-200 shadow-2xl overflow-hidden flex flex-col"
           >
-            {/* Header / Search */}
-            <div className="p-2.5 border-b border-white/[0.06] bg-[#0f1117]/80">
+            <div className="p-2.5 border-b border-neutral-100 bg-[#fafafa]">
               {events.length > 4 ? (
                 <div className="relative flex items-center">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                  <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 pointer-events-none" />
                   <input
                     ref={inputRef}
                     type="text"
-                    placeholder="Search webinars…"
+                    placeholder="Search webinars..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-md pl-8 pr-2.5 py-1 text-[12px] text-white placeholder-slate-500 focus:outline-none focus:border-[#1877f2]"
+                    className="w-full bg-white border border-neutral-200 rounded-lg pl-8 pr-2.5 py-1.5 text-[12px] text-[#111111] placeholder-neutral-400 focus:outline-none focus:border-[#111111]"
                   />
                 </div>
               ) : (
-                <div className="flex items-center justify-between px-1 text-[11px] font-semibold tracking-wider uppercase text-slate-400">
+                <div className="flex items-center justify-between px-1 text-[11px] font-semibold tracking-wider uppercase text-neutral-500">
                   <span>Webinars</span>
-                  <span className="font-mono text-slate-500">
+                  <span className="font-mono text-neutral-400">
                     {events.length} {events.length === 1 ? "room" : "rooms"}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Event List */}
-            <div className="max-h-[300px] overflow-y-auto py-1 divide-y divide-white/[0.03]">
+            <div className="max-h-[300px] overflow-y-auto py-1 divide-y divide-neutral-100">
               {filteredEvents.length === 0 ? (
-                <div className="px-4 py-6 text-center text-[12px] text-slate-500">
+                <div className="px-4 py-6 text-center text-[12px] text-neutral-500">
                   No webinars match &quot;{search}&quot;
                 </div>
               ) : (
@@ -184,23 +174,23 @@ export function EventSwitcher({
                         setOpen(false);
                       }}
                       className={cn(
-                        "w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-white/[0.04] transition group",
-                        isSelected && "bg-white/[0.06]"
+                        "w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-[#f4f4f5] transition group",
+                        isSelected && "bg-[#f4f4f5]/80"
                       )}
                     >
                       <div className="mt-1 shrink-0">
                         {isSelected ? (
-                          <div className="w-4 h-4 rounded-full bg-[#1877f2] flex items-center justify-center text-white">
+                          <div className="w-4 h-4 rounded-full bg-[#111111] flex items-center justify-center text-white">
                             <Check className="w-2.5 h-2.5 stroke-[3]" />
                           </div>
                         ) : (
                           <span
                             className={cn(
                               "inline-block w-2 h-2 rounded-full mt-1 ml-1",
-                              lifecycle === "live" && "bg-emerald-400 animate-pulse",
-                              lifecycle === "scheduled" && "bg-blue-400",
-                              lifecycle === "finished" && "bg-slate-600",
-                              lifecycle === "zero" && "bg-amber-400"
+                              lifecycle === "live" && "bg-[#00a884] animate-pulse",
+                              lifecycle === "scheduled" && "bg-[#1877f2]",
+                              lifecycle === "finished" && "bg-neutral-400",
+                              lifecycle === "zero" && "bg-amber-500"
                             )}
                           />
                         )}
@@ -210,38 +200,36 @@ export function EventSwitcher({
                         <div className="flex items-center justify-between gap-1.5">
                           <span
                             className={cn(
-                              "text-[13px] font-medium truncate",
-                              isSelected
-                                ? "text-white font-semibold"
-                                : "text-slate-200 group-hover:text-white"
+                              "text-[13px] font-medium truncate text-[#111111]",
+                              isSelected && "font-semibold"
                             )}
                           >
                             {ev.title}
                           </span>
                           <span
                             className={cn(
-                              "text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0",
+                              "text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 border",
                               lifecycle === "live" &&
-                                "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+                                "bg-emerald-50 text-emerald-700 border-emerald-200",
                               lifecycle === "scheduled" &&
-                                "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+                                "bg-blue-50 text-blue-700 border-blue-200",
                               lifecycle === "finished" &&
-                                "bg-slate-700/40 text-slate-400 border border-slate-700/60",
+                                "bg-neutral-100 text-neutral-600 border-neutral-200",
                               lifecycle === "zero" &&
-                                "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                "bg-amber-50 text-amber-800 border-amber-200"
                             )}
                           >
                             {lifecycle === "live" ? "Live" : lifecycle}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400 font-mono">
+                        <div className="flex items-center gap-3 mt-1 text-[11px] text-neutral-500 font-mono">
                           <span className="flex items-center gap-1 truncate">
-                            <Calendar className="w-3 h-3 text-slate-500 shrink-0" />
+                            <Calendar className="w-3 h-3 text-neutral-400 shrink-0" />
                             {fmtEat(ev.starts_at, { date: true })}
                           </span>
-                          <span className="flex items-center gap-1 shrink-0 text-slate-400">
-                            <Users className="w-3 h-3 text-slate-500 shrink-0" />
+                          <span className="flex items-center gap-1 shrink-0 text-neutral-500">
+                            <Users className="w-3 h-3 text-neutral-400 shrink-0" />
                             {count} {count === 1 ? "lead" : "leads"}
                           </span>
                         </div>
@@ -252,17 +240,16 @@ export function EventSwitcher({
               )}
             </div>
 
-            {/* Footer Actions */}
-            <div className="p-1.5 border-t border-white/[0.08] bg-[#0f1117] flex flex-col gap-1">
+            <div className="p-1.5 border-t border-neutral-200 bg-[#fafafa] flex flex-col gap-1">
               <button
                 type="button"
                 onClick={() => {
                   setOpen(false);
                   onNewWebinar();
                 }}
-                className="w-full text-left px-2.5 py-2 rounded-lg text-[12px] font-medium text-slate-200 hover:text-white hover:bg-white/[0.05] transition flex items-center gap-2"
+                className="w-full text-left px-2.5 py-2 rounded-xl text-[12px] font-medium text-[#111111] hover:bg-neutral-200/60 transition flex items-center gap-2"
               >
-                <Plus className="w-3.5 h-3.5 text-[#1877f2]" />
+                <Plus className="w-3.5 h-3.5 text-[#111111]" />
                 <span>New webinar</span>
               </button>
 
@@ -273,13 +260,13 @@ export function EventSwitcher({
                     setOpen(false);
                     onCleanEmptyTests();
                   }}
-                  className="w-full text-left px-2.5 py-2 rounded-lg text-[12px] font-medium text-amber-400 hover:text-amber-300 hover:bg-amber-500/[0.08] transition flex items-center justify-between group"
+                  className="w-full text-left px-2.5 py-2 rounded-xl text-[12px] font-medium text-amber-800 hover:bg-amber-100/70 transition flex items-center justify-between group"
                 >
                   <span className="flex items-center gap-2">
-                    <Trash2 className="w-3.5 h-3.5 text-amber-400 group-hover:text-amber-300" />
+                    <Trash2 className="w-3.5 h-3.5 text-amber-700" />
                     <span>Clean up empty test events</span>
                   </span>
-                  <span className="font-mono text-[10.5px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-300">
+                  <span className="font-mono text-[10.5px] bg-amber-200/70 px-2 py-0.5 rounded-full text-amber-900">
                     {emptyCount}
                   </span>
                 </button>

@@ -1,9 +1,12 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 // Next 14.2's next/font/google does not ship Geist, so we use the official
 // `geist` package, which wraps next/font/local with the same CSS variables.
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -20,9 +23,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="min-h-screen bg-canvas text-slate-100 font-sans antialiased">
-        {children}
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="min-h-screen bg-white text-[#111111] font-sans antialiased">
+        <ClerkProvider
+          publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+          afterSignOutUrl="/"
+        >
+          {children}
+        </ClerkProvider>
       </body>
     </html>
   );

@@ -6,9 +6,9 @@ import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 /* ------------------------------------------------------------------ */
-/* Tokens & Motion Presets                                             */
+/* Tokens & Motion Presets (Mobbin + shadcn Light System)              */
 /* ------------------------------------------------------------------ */
-export const HAIRLINE = "border-white/[0.08]";
+export const HAIRLINE = "border-neutral-200";
 
 export const SPRING_SNAPPY = {
   type: "spring" as const,
@@ -30,9 +30,9 @@ export const EASE_OUT_FAST = {
 };
 
 export const inputCls =
-  "w-full h-9 px-3 rounded-md bg-white/[0.03] border border-white/[0.08] text-[13px] text-white placeholder:text-slate-500 outline-none transition focus:border-[#1877f2] focus:ring-2 focus:ring-[#1877f2]/25 disabled:opacity-50";
+  "w-full h-9 px-3 rounded-lg bg-white border border-neutral-200 text-[13px] text-[#111111] placeholder:text-neutral-400 outline-none transition focus:border-[#111111] focus:ring-2 focus:ring-neutral-900/10 disabled:opacity-50";
 
-export const labelCls = "block text-[12px] font-medium text-slate-400 mb-1.5";
+export const labelCls = "block text-[12px] font-medium text-neutral-600 mb-1.5";
 
 /* ------------------------------------------------------------------ */
 /* Button                                                              */
@@ -40,13 +40,13 @@ export const labelCls = "block text-[12px] font-medium text-slate-400 mb-1.5";
 type ButtonVariant = "brand" | "secondary" | "ghost" | "success" | "danger";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  brand: "bg-[#1877f2] text-white hover:bg-[#2e86f8] border border-transparent",
-  success: "bg-[#00a884] text-white hover:bg-[#00b894] border border-transparent",
-  danger: "bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30",
+  brand: "bg-[#111111] text-white hover:bg-neutral-800 border border-transparent",
+  success: "bg-[#00a884] text-white hover:bg-[#009675] border border-transparent",
+  danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200",
   secondary:
-    "bg-white/[0.04] text-slate-200 hover:bg-white/[0.08] border border-white/[0.08]",
+    "bg-[#f4f4f5] text-[#111111] hover:bg-neutral-200/80 border border-neutral-200",
   ghost:
-    "bg-transparent text-slate-400 hover:text-white hover:bg-white/[0.06] border border-transparent",
+    "bg-transparent text-neutral-600 hover:text-[#111111] hover:bg-neutral-100 border border-transparent",
 };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -77,8 +77,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         type={type}
         disabled={disabled || loading}
         className={cn(
-          "inline-flex items-center justify-center gap-1.5 rounded-md font-medium whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1877f2]/50",
-          size === "sm" ? "h-7 px-2.5 text-[12px]" : "h-9 px-3.5 text-[13px]",
+          "inline-flex items-center justify-center gap-1.5 rounded-full font-medium whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20",
+          size === "sm" ? "h-7 px-3 text-[12px]" : "h-9 px-4 text-[13px]",
           BUTTON_VARIANTS[variant],
           className
         )}
@@ -97,11 +97,26 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 export type Tone = "emerald" | "blue" | "slate" | "amber" | "red";
 
 const TONES: Record<Tone, { pill: string; dot: string }> = {
-  emerald: { pill: "text-[#00a884] bg-[#00a884]/10 border-[#00a884]/25", dot: "bg-[#00a884]" },
-  blue: { pill: "text-[#5aa2ff] bg-[#1877f2]/10 border-[#1877f2]/25", dot: "bg-[#1877f2]" },
-  slate: { pill: "text-slate-400 bg-white/[0.04] border-white/[0.08]", dot: "bg-slate-500" },
-  amber: { pill: "text-amber-300 bg-amber-400/10 border-amber-400/25", dot: "bg-amber-400" },
-  red: { pill: "text-red-300 bg-red-500/10 border-red-500/25", dot: "bg-red-500" },
+  emerald: {
+    pill: "text-emerald-800 bg-emerald-50 border-emerald-200",
+    dot: "bg-[#00a884]",
+  },
+  blue: {
+    pill: "text-blue-700 bg-blue-50 border-blue-200",
+    dot: "bg-[#1877f2]",
+  },
+  slate: {
+    pill: "text-neutral-600 bg-[#f4f4f5] border-neutral-200",
+    dot: "bg-neutral-400",
+  },
+  amber: {
+    pill: "text-amber-800 bg-amber-50 border-amber-200",
+    dot: "bg-amber-500",
+  },
+  red: {
+    pill: "text-red-700 bg-red-50 border-red-200",
+    dot: "bg-red-500",
+  },
 };
 
 export function StatusPill({
@@ -121,7 +136,7 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 h-5 px-2 rounded-full border text-[11px] font-medium leading-none whitespace-nowrap",
+        "inline-flex items-center gap-1.5 h-5 px-2.5 rounded-full border text-[11px] font-medium leading-none whitespace-nowrap",
         t.pill,
         className
       )}
@@ -141,7 +156,7 @@ export function StatusPill({
 
 export function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex items-center h-[18px] px-1.5 rounded border border-white/[0.1] bg-white/[0.04] font-mono text-[10px] text-slate-400">
+    <kbd className="inline-flex items-center h-[18px] px-1.5 rounded border border-neutral-200 bg-[#f4f4f5] font-mono text-[10px] text-neutral-600">
       {children}
     </kbd>
   );
@@ -197,7 +212,7 @@ export function Dialog({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.16 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-[2px]"
+            className="fixed inset-0 bg-black/35 backdrop-blur-[2px]"
             onClick={onClose}
             aria-hidden
           />
@@ -212,7 +227,7 @@ export function Dialog({
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={SPRING_PANEL}
             className={cn(
-              "relative w-full my-auto rounded-xl border bg-[#0f1115] shadow-[0_24px_80px_-12px_rgba(0,0,0,0.8)] overflow-hidden",
+              "relative w-full my-auto rounded-2xl border bg-white text-[#111111] shadow-[0_24px_80px_-16px_rgba(0,0,0,0.18)] overflow-hidden",
               HAIRLINE,
               width
             )}
@@ -220,16 +235,20 @@ export function Dialog({
             <div className={cn("flex items-start justify-between gap-4 px-5 py-4 border-b", HAIRLINE)}>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-[14px] font-semibold text-white tracking-tight">{title}</h2>
+                  <h2 className="text-[14px] font-semibold text-[#111111] tracking-tight">
+                    {title}
+                  </h2>
                   {headerExtra}
                 </div>
-                {description && <p className="text-[12px] text-slate-400 mt-0.5">{description}</p>}
+                {description && (
+                  <p className="text-[12px] text-neutral-500 mt-0.5">{description}</p>
+                )}
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="p-1 -mr-1 rounded text-slate-500 hover:text-white hover:bg-white/[0.06] transition"
+                className="p-1 -mr-1 rounded-full text-neutral-400 hover:text-[#111111] hover:bg-neutral-100 transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -238,7 +257,7 @@ export function Dialog({
             {footer && (
               <div
                 className={cn(
-                  "px-5 py-3 border-t flex items-center justify-between gap-3 bg-white/[0.015] rounded-b-xl",
+                  "px-5 py-3 border-t flex items-center justify-between gap-3 bg-[#fafafa] rounded-b-2xl",
                   HAIRLINE
                 )}
               >
@@ -273,7 +292,7 @@ export function Sheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
             onClick={onClose}
             aria-hidden
           />
@@ -287,7 +306,7 @@ export function Sheet({
             exit={{ x: "100%" }}
             transition={SPRING_PANEL}
             className={cn(
-              "absolute right-0 top-0 h-full w-full flex flex-col bg-[#0f1115] border-l shadow-2xl",
+              "absolute right-0 top-0 h-full w-full flex flex-col bg-white text-[#111111] border-l shadow-2xl",
               HAIRLINE,
               width
             )}
@@ -300,16 +319,20 @@ export function Sheet({
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-[14px] font-semibold text-white tracking-tight">{title}</h2>
+                  <h2 className="text-[14px] font-semibold text-[#111111] tracking-tight">
+                    {title}
+                  </h2>
                   {headerExtra}
                 </div>
-                {description && <p className="text-[12px] text-slate-400 mt-0.5">{description}</p>}
+                {description && (
+                  <p className="text-[12px] text-neutral-500 mt-0.5">{description}</p>
+                )}
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="p-1 -mr-1 rounded text-slate-500 hover:text-white hover:bg-white/[0.06] transition"
+                className="p-1 -mr-1 rounded-full text-neutral-400 hover:text-[#111111] hover:bg-neutral-100 transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -318,7 +341,7 @@ export function Sheet({
             {footer && (
               <div
                 className={cn(
-                  "px-5 py-3 border-t shrink-0 flex items-center justify-between gap-3",
+                  "px-5 py-3 border-t bg-[#fafafa] shrink-0 flex items-center justify-between gap-3",
                   HAIRLINE
                 )}
               >
@@ -364,17 +387,14 @@ export function ToastStack({
             exit={{ opacity: 0, y: 6, scale: 0.95 }}
             transition={SPRING_SNAPPY}
             onClick={() => onDismiss(t.id)}
-            className={cn(
-              "pointer-events-auto max-w-sm flex items-start gap-2.5 text-left rounded-lg border bg-[#16181d] px-3.5 py-2.5 shadow-xl text-[12.5px] text-slate-200",
-              HAIRLINE
-            )}
+            className="pointer-events-auto max-w-sm flex items-start gap-2.5 text-left rounded-full border border-neutral-800 bg-[#111111] px-4 py-2.5 shadow-lg text-[12.5px] text-white"
           >
             <span
               className={cn(
                 "mt-1 w-1.5 h-1.5 rounded-full shrink-0",
-                t.tone === "success" && "bg-[#00a884]",
-                t.tone === "error" && "bg-red-500",
-                t.tone === "info" && "bg-[#1877f2]"
+                t.tone === "success" && "bg-[#25d366]",
+                t.tone === "error" && "bg-red-400",
+                t.tone === "info" && "bg-blue-400"
               )}
             />
             <span className="leading-snug">{t.message}</span>
@@ -396,8 +416,8 @@ export function SectionLabel({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 h-9 px-4 border-b border-white/[0.08]">
-      <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
+    <div className="flex items-center justify-between gap-3 h-9 px-4 bg-[#fafafa] border-b border-neutral-200">
+      <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-neutral-500">
         {children}
       </h3>
       {right}

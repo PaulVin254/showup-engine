@@ -71,7 +71,7 @@ export function RegistrantsSheet({
       width="max-w-2xl"
       footer={
         <>
-          <span className="text-[11px] text-slate-500">CSV includes attendance flags</span>
+          <span className="text-[11px] text-neutral-500">CSV includes attendance flags</span>
           <Button size="sm" onClick={onExport} icon={<Download className="w-3.5 h-3.5" />}>
             Export CSV
           </Button>
@@ -80,7 +80,7 @@ export function RegistrantsSheet({
     >
       <form
         onSubmit={submit}
-        className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 px-4 sm:px-5 py-4 border-b border-white/[0.08] items-start"
+        className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 px-4 sm:px-5 py-4 border-b border-neutral-200 bg-[#fafafa] items-start"
       >
         <input
           required
@@ -96,10 +96,10 @@ export function RegistrantsSheet({
             placeholder="0712 345 678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className={cn(inputCls, "font-mono tabular-nums", phoneInvalid && "border-red-500/60")}
+            className={cn(inputCls, "font-mono tabular-nums", phoneInvalid && "border-red-500")}
           />
-          <div className="mt-1 h-3.5 text-[10.5px] font-mono tabular-nums text-slate-500">
-            {normalized ? `→ +${normalized}` : phoneInvalid ? "Not a valid Kenyan number" : ""}
+          <div className="mt-1 h-3.5 text-[10.5px] font-mono tabular-nums text-neutral-500">
+            {normalized ? `-> +${normalized}` : phoneInvalid ? "Not a valid Kenyan number" : ""}
           </div>
         </div>
         <Button type="submit" variant="brand" loading={adding} disabled={!name.trim() || !normalized} icon={<Plus className="w-3.5 h-3.5" />}>
@@ -107,9 +107,9 @@ export function RegistrantsSheet({
         </Button>
       </form>
 
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 sm:px-5 py-3 border-b border-white/[0.08]">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 sm:px-5 py-3 border-b border-neutral-200 bg-white">
         <div className="relative flex-1 min-w-0">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input
             placeholder="Search name or number"
             value={q}
@@ -117,15 +117,17 @@ export function RegistrantsSheet({
             className={cn(inputCls, "pl-8")}
           />
         </div>
-        <div className="inline-flex self-start sm:self-auto p-0.5 rounded-md bg-white/[0.04] border border-white/[0.08]">
+        <div className="inline-flex self-start sm:self-auto p-0.5 rounded-full bg-[#f4f4f5] border border-neutral-200">
           {(["all", "joined", "waiting"] as const).map((f) => (
             <button
               key={f}
               type="button"
               onClick={() => setFilter(f)}
               className={cn(
-                "h-7 px-2.5 rounded text-[12px] capitalize transition",
-                filter === f ? "bg-white/[0.1] text-white" : "text-slate-500 hover:text-slate-200"
+                "h-7 px-3 rounded-full text-[12px] font-medium capitalize transition",
+                filter === f
+                  ? "bg-white text-[#111111] shadow-xs"
+                  : "text-neutral-500 hover:text-[#111111]"
               )}
             >
               {f}
@@ -134,28 +136,28 @@ export function RegistrantsSheet({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto bg-white">
         <table className="w-full text-[12.5px]">
-          <thead className="text-left text-[11px] uppercase tracking-wider text-slate-500">
-            <tr className="border-b border-white/[0.08]">
-              <th className="px-4 sm:px-5 py-2 font-medium">Name</th>
-              <th className="px-2 py-2 font-medium">WhatsApp</th>
-              <th className="px-2 py-2 font-medium hidden sm:table-cell">Added</th>
-              <th className="px-2 py-2 font-medium">Status</th>
-              <th className="px-4 sm:px-5 py-2" />
+          <thead className="text-left text-[11px] uppercase tracking-wider text-neutral-500 bg-[#fafafa]">
+            <tr className="border-b border-neutral-200">
+              <th className="px-4 sm:px-5 py-2.5 font-medium">Name</th>
+              <th className="px-2 py-2.5 font-medium">WhatsApp</th>
+              <th className="px-2 py-2.5 font-medium hidden sm:table-cell">Added</th>
+              <th className="px-2 py-2.5 font-medium">Status</th>
+              <th className="px-4 sm:px-5 py-2.5" />
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => {
               const att = r.clicked_join_link || r.zoom_verified;
               return (
-                <tr key={r.id} className="border-b border-white/[0.05] hover:bg-white/[0.02] group">
+                <tr key={r.id} className="border-b border-neutral-100 hover:bg-[#fafafa] group transition-colors">
                   <td className="px-4 sm:px-5 py-2.5 max-w-[130px] sm:max-w-none">
-                    <div className="text-white font-medium truncate">{r.full_name}</div>
-                    <div className="text-[11px] text-slate-500">{SOURCE_LABEL[r.source]}</div>
+                    <div className="text-[#111111] font-medium truncate">{r.full_name}</div>
+                    <div className="text-[11px] text-neutral-500">{SOURCE_LABEL[r.source]}</div>
                   </td>
-                  <td className="px-2 py-2.5 font-mono tabular-nums text-slate-400 whitespace-nowrap">{formatPhoneDisplay(r.phone_e164)}</td>
-                  <td className="px-2 py-2.5 text-slate-500 hidden sm:table-cell font-mono tabular-nums">
+                  <td className="px-2 py-2.5 font-mono tabular-nums text-neutral-600 whitespace-nowrap">{formatPhoneDisplay(r.phone_e164)}</td>
+                  <td className="px-2 py-2.5 text-neutral-500 hidden sm:table-cell font-mono tabular-nums">
                     {relativeAgo(r.created_at, now)}
                   </td>
                   <td className="px-2 py-2.5">
@@ -177,7 +179,7 @@ export function RegistrantsSheet({
                         navigator.clipboard.writeText(`${origin}/j/${r.tracking_token}`);
                         onToast("Personal join link copied");
                       }}
-                      className="p-1 rounded text-slate-600 hover:text-white hover:bg-white/[0.06] sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition"
+                      className="p-1.5 rounded-full text-neutral-400 hover:text-[#111111] hover:bg-neutral-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition"
                     >
                       <Copy className="w-3.5 h-3.5" />
                     </button>
@@ -187,7 +189,7 @@ export function RegistrantsSheet({
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center text-slate-500">
+                <td colSpan={5} className="px-5 py-12 text-center text-neutral-500">
                   No registrants match.
                 </td>
               </tr>
@@ -198,4 +200,3 @@ export function RegistrantsSheet({
     </Sheet>
   );
 }
-

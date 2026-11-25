@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { normalizeKenyanPhone } from "@/lib/phone";
 import {
   checkSupabaseMigrationStatus,
-  findOrCreateTenantByPhone,
   getActiveTenant,
   readLocalDb,
   supabase,
@@ -60,9 +59,9 @@ export async function POST(req: Request) {
       planTier in tierPricing ? planTier : "event_pass";
     const { amountKes, limit: newLimit, label } = tierPricing[resolvedTier];
 
-    let { tenant } = await getActiveTenant();
-    if (tenant.id === "guest") {
-      tenant = await findOrCreateTenantByPhone({ phoneE164 });
+    const { tenant, isGuest } = await getActiveTenant();
+    if (isGuest) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const supabaseReady = await checkSupabaseMigrationStatus();
 

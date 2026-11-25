@@ -5,19 +5,14 @@ import { normalizeKenyanPhone } from "@/lib/phone";
 import { normalizeJoinUrl } from "@/lib/pipeline";
 import {
   checkSupabaseMigrationStatus,
-  findOrCreateTenantByPhone,
   getActiveTenant,
   readLocalDb,
   sanitizeTenantForClient,
-  setTenantSessionCookie,
   supabase,
+  updateTenantContactPhone,
   writeLocalDb,
 } from "@/lib/store";
 import { ShowUpEvent } from "@/lib/types";
-
-function withTenantCookie(res: NextResponse, tenantId: string): NextResponse {
-  return setTenantSessionCookie(res, tenantId);
-}
 
 export async function POST(req: Request) {
   try {
@@ -47,27 +42,19 @@ export async function POST(req: Request) {
       );
     }
 
-    let { tenant, isGuest } = await getActiveTenant();
+    const { tenant, isGuest } = await getActiveTenant();
+    if (isGuest) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const supabaseReady = await checkSupabaseMigrationStatus();
 
     const normalizedHostPhone = hostPhone
       ? normalizeKenyanPhone(String(hostPhone))
       : null;
 
-    if (normalizedHostPhone) {
-      tenant = await findOrCreateTenantByPhone({
-        phoneE164: normalizedHostPhone,
-        hostName: hostName || undefined,
-      });
-      isGuest = false;
-    } else if (isGuest) {
-      return NextResponse.json(
-        {
-          error:
-            "Please enter your Host WhatsApp number so we can save your live room.",
-        },
-        { status: 400 }
-      );
+    if (normalizedHostPhone && !tenant.phone_e164) {
+      await updateTenantContactPhone(tenant.id, normalizedHostPhone);
+      tenant.phone_e164 = normalizedHostPhone;
     }
 
     const baseSlug = String(title)
@@ -78,12 +65,20 @@ export async function POST(req: Request) {
 
     const sanitizedJoinUrl = joinUrl ? normalizeJoinUrl(String(joinUrl)) : "";
 
+    const rawHost = String(hostName || "").trim();
+    const safeHostName =
+      rawHost && !/^your('?s)?(\s+live\s+room)?$/i.test(rawHost)
+        ? rawHost
+        : tenant.business_name && !/^your('?s)?(\s+live\s+room)?$/i.test(tenant.business_name.trim())
+        ? tenant.business_name
+        : "ShowUp Host";
+
     const newEvent: ShowUpEvent = {
       id: crypto.randomUUID(),
       tenant_id: tenant.id,
       title,
       slug,
-      host_name: hostName || tenant.business_name,
+      host_name: safeHostName,
       teaser_hook:
         teaserHook || "the exact step-by-step framework to achieve results",
       starts_at: new Date(startsAt).toISOString(),
@@ -110,9 +105,6 @@ export async function POST(req: Request) {
 
     if (supabaseReady && supabase) {
       if (eventId) {
-        if (isGuest) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
         const { data, error } = await supabase
           .from("showup_events")
           .update({
@@ -127,10 +119,10 @@ export async function POST(req: Request) {
           .select("*")
           .single();
         if (!error && data) {
-          return withTenantCookie(
-            NextResponse.json({ event: data, tenant: sanitizeTenantForClient(tenant) }),
-            tenant.id
-          );
+          return NextResponse.json({
+            event: data,
+            tenant: sanitizeTenantForClient(tenant),
+          });
         }
         return NextResponse.json({ error: "Event not found" }, { status: 404 });
       }
@@ -143,10 +135,10 @@ export async function POST(req: Request) {
         .single();
 
       if (!error && data) {
-        return withTenantCookie(
-          NextResponse.json({ event: data, tenant: sanitizeTenantForClient(tenant) }),
-          tenant.id
-        );
+        return NextResponse.json({
+          event: data,
+          tenant: sanitizeTenantForClient(tenant),
+        });
       }
 
       // Fallback: If table has not run the latest ALTER TABLE for is_paid/sender_mode, omit them
@@ -159,33 +151,27 @@ export async function POST(req: Request) {
           .single();
 
         if (!fallbackError && fallbackData) {
-          return withTenantCookie(
-            NextResponse.json({
-              event: {
-                ...fallbackData,
-                is_paid: Boolean(isPaid),
-                sender_mode: senderMode,
-              },
-              tenant: sanitizeTenantForClient(tenant),
-            }),
-            tenant.id
-          );
+          return NextResponse.json({
+            event: {
+              ...fallbackData,
+              is_paid: Boolean(isPaid),
+              sender_mode: senderMode,
+            },
+            tenant: sanitizeTenantForClient(tenant),
+          });
         }
         throw new Error(fallbackError?.message || error.message);
       }
 
       if (error) throw new Error(error.message);
-      return withTenantCookie(
-        NextResponse.json({ event: data, tenant: sanitizeTenantForClient(tenant) }),
-        tenant.id
-      );
+      return NextResponse.json({
+        event: data,
+        tenant: sanitizeTenantForClient(tenant),
+      });
     }
 
     const db = readLocalDb();
     if (eventId) {
-      if (isGuest) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
       const existingIdx = db.events.findIndex(
         (e) => e.id === eventId && e.tenant_id === tenant.id
       );
@@ -200,23 +186,20 @@ export async function POST(req: Request) {
           sender_mode: newEvent.sender_mode,
         };
         writeLocalDb(db);
-        return withTenantCookie(
-          NextResponse.json({
-            event: db.events[existingIdx],
-            tenant: sanitizeTenantForClient(tenant),
-          }),
-          tenant.id
-        );
+        return NextResponse.json({
+          event: db.events[existingIdx],
+          tenant: sanitizeTenantForClient(tenant),
+        });
       }
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
     db.events.unshift(newEvent);
     writeLocalDb(db);
 
-    return withTenantCookie(
-      NextResponse.json({ event: newEvent, tenant: sanitizeTenantForClient(tenant) }),
-      tenant.id
-    );
+    return NextResponse.json({
+      event: newEvent,
+      tenant: sanitizeTenantForClient(tenant),
+    });
   } catch (err: unknown) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed creating event" },

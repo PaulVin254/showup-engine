@@ -112,6 +112,31 @@ export const DEFAULT_WEBINAR_TEMPLATES: DefaultTemplateBlueprint[] = [
   },
 ];
 
+const DEFAULT_TEMPLATE_SAMPLES = [
+  "Wanjiku",
+  "Nairobi Real Estate Masterclass",
+  "7:00 PM",
+  "Brian",
+  "how to spot high-yield plots",
+];
+
+/** Returns the highest 1-based {{n}} placeholder index in a WhatsApp template body. */
+export function countTemplatePlaceholders(bodyText: string): number {
+  const matches = Array.from(bodyText.matchAll(/\{\{(\d+)\}\}/g), (m) => Number(m[1]));
+  return matches.length > 0 ? Math.max(...matches) : 0;
+}
+
+/** Builds an example_values array sized to the highest {{n}} placeholder in bodyText. */
+export function buildExampleValuesForBody(bodyText: string, provided?: string[]): string[] {
+  const count = countTemplatePlaceholders(bodyText);
+  if (count === 0) return [];
+  return Array.from({ length: count }, (_, idx) => {
+    const custom = provided?.[idx]?.trim();
+    if (custom) return custom;
+    return DEFAULT_TEMPLATE_SAMPLES[idx] ?? `Sample ${idx + 1}`;
+  });
+}
+
 export function renderTemplatePreview(bodyText: string, values: string[]): string {
   let rendered = bodyText;
   values.forEach((val, idx) => {

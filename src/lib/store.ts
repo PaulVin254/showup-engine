@@ -1,8 +1,6 @@
-import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { cookies } from "next/headers";
-import type { NextResponse } from "next/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   ShowUpEvent,
@@ -13,6 +11,7 @@ import {
   ShowUpTenant,
 } from "./types";
 import { seedSystemTemplatesForTenant } from "./default-templates";
+import { normalizeKenyanPhone } from "./phone";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -34,89 +33,14 @@ const DB_FILE = path.join(DATA_DIR, "showup-db.json");
 
 export const DEFAULT_TENANT_ID = "11111111-1111-1111-1111-111111111111";
 export const DEMO_EVENT_ID = "22222222-2222-2222-2222-222222222222";
-export const TENANT_COOKIE_NAME = "showup_tenant_id";
-
-function getSessionSecret(): string {
-  return (
-    process.env.SESSION_SECRET ||
-    process.env.META_APP_SECRET ||
-    process.env.QSTASH_CURRENT_SIGNING_KEY ||
-    "showup-local-dev-session-secret"
-  );
-}
-
-export function signTenantSession(tenantId: string): string {
-  const sig = crypto
-    .createHmac("sha256", getSessionSecret())
-    .update(tenantId)
-    .digest("hex");
-  return `${tenantId}.${sig}`;
-}
-
-export function verifyTenantSession(rawCookieValue: string): string | null {
-  const dotIdx = rawCookieValue.lastIndexOf(".");
-  if (dotIdx <= 0) return null;
-
-  const tenantId = rawCookieValue.slice(0, dotIdx);
-  const providedSig = rawCookieValue.slice(dotIdx + 1);
-  if (!tenantId || !providedSig) return null;
-
-  const expectedSig = crypto
-    .createHmac("sha256", getSessionSecret())
-    .update(tenantId)
-    .digest("hex");
-
-  const providedBuf = Buffer.from(providedSig, "utf8");
-  const expectedBuf = Buffer.from(expectedSig, "utf8");
-  if (providedBuf.length !== expectedBuf.length) return null;
-
-  if (!crypto.timingSafeEqual(providedBuf, expectedBuf)) return null;
-  return tenantId;
-}
-
-export function setTenantSessionCookie(
-  res: NextResponse,
-  tenantId: string
-): NextResponse {
-  if (tenantId && tenantId !== "guest") {
-    res.cookies.set(TENANT_COOKIE_NAME, signTenantSession(tenantId), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 30 * 24 * 60 * 60,
-    });
-  }
-  return res;
-}
-
-export function clearTenantSessionCookie(res: NextResponse): NextResponse {
-  res.cookies.set(TENANT_COOKIE_NAME, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
-  return res;
-}
+const FOUNDER_AIRTEL_TENANT_ID = "ec604aa0-52dc-4aec-b5ca-aa6cf7393857";
+const FOUNDER_EMAILS = new Set(["vinwakolipaul@gmail.com", "paul@eris.co.ke"]);
 
 export function sanitizeTenantForClient(tenant: ShowUpTenant): ShowUpTenant {
   return {
     ...tenant,
     access_token: null,
   };
-}
-
-export function getCookieTenantId(): string | null {
-  try {
-    const cookieStore = cookies();
-    const raw = cookieStore.get(TENANT_COOKIE_NAME)?.value;
-    if (!raw) return null;
-    return verifyTenantSession(raw);
-  } catch {
-    return null;
-  }
 }
 
 function createInitialSeed(): LocalDbSchema {
@@ -341,32 +265,107 @@ export async function getTenantById(tenantId: string): Promise<ShowUpTenant | nu
   return db.tenants.find((t) => t.id === tenantId) || null;
 }
 
-export async function findOrCreateTenantByPhone(params: {
-  phoneE164: string;
-  hostName?: string;
+export async function findOrCreateTenantByClerkUser(params: {
+  clerkUserId: string;
+  email?: string | null;
+  fullName?: string | null;
+  phoneE164?: string | null;
 }): Promise<ShowUpTenant> {
-  const { phoneE164, hostName } = params;
+  const { clerkUserId, email, fullName, phoneE164 } = params;
   const supabaseReady = await checkSupabaseMigrationStatus();
   const now = new Date().toISOString();
+  const cleanEmail = email?.trim().toLowerCase() || "";
+  const cleanName = fullName?.trim() || "";
 
   if (supabaseReady && supabase) {
-    const { data: existing } = await supabase
+    // 1. Direct lookup by clerk_user_id
+    const { data: existing, error: lookupErr } = await supabase
       .from("showup_tenants")
       .select("*")
-      .eq("phone_e164", phoneE164)
-      .order("created_at", { ascending: true })
-      .limit(1)
+      .eq("clerk_user_id", clerkUserId)
       .maybeSingle();
+
+    if (lookupErr && lookupErr.message?.includes("clerk_user_id")) {
+      console.error(
+        "[store] Missing clerk_user_id column on showup_tenants. Run: ALTER TABLE showup_tenants ADD COLUMN IF NOT EXISTS clerk_user_id TEXT UNIQUE;"
+      );
+    }
 
     if (existing) {
       return existing as ShowUpTenant;
     }
 
+    // 2. One-time migration: claim an existing unclaimed tenant matching founder or verified email/phone
+    if (!lookupErr) {
+      let claimedCandidate: ShowUpTenant | null = null;
+
+      if (cleanEmail && FOUNDER_EMAILS.has(cleanEmail)) {
+        const { data: founderTenant } = await supabase
+          .from("showup_tenants")
+          .select("*")
+          .eq("id", FOUNDER_AIRTEL_TENANT_ID)
+          .is("clerk_user_id", null)
+          .maybeSingle();
+        if (founderTenant) {
+          claimedCandidate = founderTenant as ShowUpTenant;
+        }
+      }
+
+      if (!claimedCandidate && cleanEmail) {
+        const { data: emailMatch } = await supabase
+          .from("showup_tenants")
+          .select("*")
+          .ilike("email", cleanEmail)
+          .is("clerk_user_id", null)
+          .neq("id", DEFAULT_TENANT_ID)
+          .order("waba_status", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (emailMatch) {
+          claimedCandidate = emailMatch as ShowUpTenant;
+        }
+      }
+
+      if (!claimedCandidate && phoneE164) {
+        const { data: phoneMatch } = await supabase
+          .from("showup_tenants")
+          .select("*")
+          .eq("phone_e164", phoneE164)
+          .is("clerk_user_id", null)
+          .neq("id", DEFAULT_TENANT_ID)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (phoneMatch) {
+          claimedCandidate = phoneMatch as ShowUpTenant;
+        }
+      }
+
+      if (claimedCandidate) {
+        const { data: updated, error: claimErr } = await supabase
+          .from("showup_tenants")
+          .update({
+            clerk_user_id: clerkUserId,
+            ...(!claimedCandidate.email && cleanEmail ? { email: cleanEmail } : {}),
+          })
+          .eq("id", claimedCandidate.id)
+          .is("clerk_user_id", null)
+          .select("*")
+          .maybeSingle();
+
+        if (!claimErr && updated) {
+          return updated as ShowUpTenant;
+        }
+      }
+    }
+
+    // 3. Provision a fresh tenant for the new Clerk user
     const newTenant: ShowUpTenant = {
       id: crypto.randomUUID(),
-      business_name: hostName ? `${hostName}'s Live Room` : `Host (${phoneE164})`,
-      email: "",
-      phone_e164: phoneE164,
+      clerk_user_id: clerkUserId,
+      business_name: cleanName ? `${cleanName}'s Live Room` : "ShowUp Host",
+      email: cleanEmail,
+      phone_e164: phoneE164 || "",
       waba_id: null,
       phone_number_id: null,
       display_phone_number: null,
@@ -394,17 +393,52 @@ export async function findOrCreateTenantByPhone(params: {
       );
       return inserted as ShowUpTenant;
     }
+
+    // Fallback if clerk_user_id column is not yet added in Supabase
+    if (error && error.message?.includes("clerk_user_id")) {
+      const { clerk_user_id: _omit, ...compatTenant } = newTenant;
+      const { data: compatInserted } = await supabase
+        .from("showup_tenants")
+        .insert(compatTenant)
+        .select("*")
+        .single();
+      if (compatInserted) {
+        const templates = seedSystemTemplatesForTenant(compatInserted.id);
+        await supabase.from("showup_templates").upsert(
+          templates.map(({ id: _unused, ...rest }) => rest),
+          { onConflict: "tenant_id,name,language" }
+        );
+        return compatInserted as ShowUpTenant;
+      }
+    }
   }
 
+  // Local JSON DB fallback
   const db = readLocalDb();
-  const existingLocal = db.tenants.find((t) => t.phone_e164 === phoneE164);
-  if (existingLocal) return existingLocal;
+  const byClerk = db.tenants.find((t) => t.clerk_user_id === clerkUserId);
+  if (byClerk) return byClerk;
+
+  const claimableLocal = db.tenants.find(
+    (t) =>
+      !t.clerk_user_id &&
+      t.id !== DEFAULT_TENANT_ID &&
+      ((cleanEmail && FOUNDER_EMAILS.has(cleanEmail) && t.id === FOUNDER_AIRTEL_TENANT_ID) ||
+        (cleanEmail && t.email?.toLowerCase() === cleanEmail) ||
+        (phoneE164 && t.phone_e164 === phoneE164))
+  );
+  if (claimableLocal) {
+    claimableLocal.clerk_user_id = clerkUserId;
+    if (!claimableLocal.email && cleanEmail) claimableLocal.email = cleanEmail;
+    writeLocalDb(db);
+    return claimableLocal;
+  }
 
   const newLocalTenant: ShowUpTenant = {
     id: crypto.randomUUID(),
-    business_name: hostName ? `${hostName}'s Live Room` : `Host (${phoneE164})`,
-    email: "",
-    phone_e164: phoneE164,
+    clerk_user_id: clerkUserId,
+    business_name: cleanName ? `${cleanName}'s Live Room` : "ShowUp Host",
+    email: cleanEmail,
+    phone_e164: phoneE164 || "",
     waba_id: null,
     phone_number_id: null,
     display_phone_number: null,
@@ -424,22 +458,87 @@ export async function findOrCreateTenantByPhone(params: {
   return newLocalTenant;
 }
 
+export async function updateTenantContactPhone(
+  tenantId: string,
+  phoneE164: string
+): Promise<void> {
+  const supabaseReady = await checkSupabaseMigrationStatus();
+  if (supabaseReady && supabase) {
+    await supabase
+      .from("showup_tenants")
+      .update({ phone_e164: phoneE164 })
+      .eq("id", tenantId);
+    return;
+  }
+
+  const db = readLocalDb();
+  const target = db.tenants.find((t) => t.id === tenantId);
+  if (target) {
+    target.phone_e164 = phoneE164;
+    writeLocalDb(db);
+  }
+}
+
 export async function getActiveTenant(explicitTenantId?: string | null): Promise<{
   tenant: ShowUpTenant;
   supabaseReady: boolean;
   isGuest: boolean;
 }> {
   const supabaseReady = await checkSupabaseMigrationStatus();
-  const targetTenantId = explicitTenantId || getCookieTenantId();
 
-  if (targetTenantId && targetTenantId !== "guest") {
-    const found = await getTenantById(targetTenantId);
+  if (explicitTenantId && explicitTenantId !== "guest") {
+    const found = await getTenantById(explicitTenantId);
     if (found) {
       return { tenant: found, supabaseReady, isGuest: false };
     }
   }
 
-  // Unauthenticated / new visitor gets a clean isolated starter state (0 events)
+  let clerkUserId: string | null = null;
+  try {
+    const authResult = await auth();
+    clerkUserId = authResult.userId || null;
+  } catch {
+    clerkUserId = null;
+  }
+
+  if (clerkUserId) {
+    let email: string | null = null;
+    let fullName: string | null = null;
+    let phoneE164: string | null = null;
+
+    try {
+      const user = await currentUser();
+      if (user) {
+        email =
+          user.primaryEmailAddress?.emailAddress ||
+          user.emailAddresses?.[0]?.emailAddress ||
+          null;
+        fullName =
+          user.fullName ||
+          [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
+          null;
+        const rawPhone =
+          user.primaryPhoneNumber?.phoneNumber ||
+          user.phoneNumbers?.[0]?.phoneNumber ||
+          null;
+        if (rawPhone) {
+          phoneE164 = normalizeKenyanPhone(rawPhone);
+        }
+      }
+    } catch {
+      // Proceed with clerkUserId if currentUser() is unavailable
+    }
+
+    const tenant = await findOrCreateTenantByClerkUser({
+      clerkUserId,
+      email,
+      fullName,
+      phoneE164,
+    });
+    return { tenant, supabaseReady, isGuest: false };
+  }
+
+  // Unauthenticated / guest fallback
   const now = new Date().toISOString();
   const guestTenant: ShowUpTenant = {
     id: "guest",

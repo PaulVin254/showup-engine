@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
 body {
-  background-color: #0d0f12;
-  color: #f8fafc;
+  background-color: #ffffff;
+  color: #111111;
   font-feature-settings: "ss01", "cv01", "cv02", "cv11";
   max-width: 100vw;
   overflow-x: hidden;
@@ -22,51 +22,47 @@ h2 {
 }
 
 ::selection {
-  background: #1877f2;
+  background: #111111;
   color: #ffffff;
 }
 
 /* ========================================================================= */
-/* NEATMAIL MINIMALIST SAAS DESIGN SYSTEM                                    */
+/* MOBBIN & SHADCN LIGHT DESIGN SYSTEM                                       */
 /* ========================================================================= */
 
-/* Hairline border utility */
 .border-hairline {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .border-hairline-hover:hover {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: rgba(0, 0, 0, 0.18);
 }
 
-/* Minimalist dark card container */
 .neat-card {
-  background-color: #12141a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #ffffff;
+  border: 1px solid #e5e5e5;
   border-radius: 20px;
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.08);
   transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
 .neat-card-hover:hover {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: #d4d4d8;
 }
 
-/* Crisp input field */
 .neat-input {
-  background-color: #171a22;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #ffffff;
+  border: 1px solid #e5e5e5;
   border-radius: 12px;
-  color: #ffffff;
+  color: #111111;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .neat-input:focus-within {
-  border-color: #1877f2;
-  box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.25);
+  border-color: #111111;
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.08);
 }
 
-/* Pulsing dot animation for live status badge */
 @keyframes pulse-dot {
   0%, 100% {
     opacity: 1;
@@ -80,13 +76,6 @@ h2 {
 
 .animate-pulse-dot {
   animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Minimalist text gradient */
-.text-gradient-hero {
-  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 /* Dashboard motion */
@@ -113,11 +102,13 @@ h2 {
 .animate-toast-in { animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-rise { animation: rise 0.25s ease-out both; }
 
-/* Subtle WhatsApp-style chat wallpaper */
+/* Authentic Light WhatsApp Chat Wallpaper */
 .wa-wallpaper {
-  background-color: #0b141a;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 18px 18px;
+  background-color: #efeae2;
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(0, 168, 132, 0.06), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64' fill='none'%3E%3Cg stroke='%23000000' stroke-opacity='0.035' stroke-width='1'%3E%3Crect x='8' y='10' width='12' height='9' rx='2'/%3E%3Cpath d='M42 12l5 4-5 4z'/%3E%3Ccircle cx='50' cy='46' r='5'/%3E%3Cpath d='M12 44c3-3 7-3 10 0'/%3E%3Cpath d='M28 28h8M32 24v8'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: auto, 64px 64px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -131,9 +122,9 @@ input[type="range"] {
   appearance: none;
   height: 6px;
   border-radius: 9999px;
-  background: #1e222b;
+  background: #e4e4e7;
   outline: none;
-  accent-color: #1877f2;
+  accent-color: #111111;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -141,8 +132,8 @@ input[type="range"]::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
   border-radius: 9999px;
-  background: #f8fafc;
-  border: 3px solid #1877f2;
+  background: #ffffff;
+  border: 3px solid #111111;
   cursor: pointer;
   transition: transform 0.15s ease;
 }

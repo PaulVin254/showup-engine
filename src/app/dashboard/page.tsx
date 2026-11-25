@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { UserButton } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Plus, Smartphone } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import {
   SequenceStage,
   ShowUpEvent,
@@ -21,7 +22,6 @@ import { stageTemplate } from "@/lib/pipeline";
 import { cn } from "@/lib/cn";
 import { EmbeddedSignupModal } from "@/components/whatsapp/EmbeddedSignupModal";
 import { EventSetupWizard } from "@/components/wizard/EventSetupWizard";
-import { HostAuthModal } from "@/components/auth/HostAuthModal";
 import { RoiReportModal } from "@/components/roi/RoiReportModal";
 import { CommandCenter } from "@/components/dashboard/CommandCenter";
 import { EventSwitcher } from "@/components/dashboard/EventSwitcher";
@@ -58,7 +58,6 @@ export default function DashboardPage() {
 
   // Overlays
   const [embeddedOpen, setEmbeddedOpen] = useState(false);
-  const [hostAuthOpen, setHostAuthOpen] = useState(false);
   const [registrantsOpen, setRegistrantsOpen] = useState(false);
   const [roiOpen, setRoiOpen] = useState(false);
 
@@ -80,6 +79,7 @@ export default function DashboardPage() {
   const loadWorkspace = useCallback(async () => {
     try {
       const res = await fetch("/api/state");
+      if (res.status === 401) return;
       const data = await res.json();
       setTenant(data.tenant || null);
       const loaded: ShowUpEvent[] = data.events || [];
@@ -230,7 +230,6 @@ export default function DashboardPage() {
     ).length;
   }, [activeEvent, events, registrants]);
 
-  // Live data: poll faster while the room is open.
   useEffect(() => {
     if (!activeEvent) return;
     const id = setInterval(loadWorkspace, lifecycle === "live" ? 10_000 : 30_000);
@@ -261,8 +260,7 @@ export default function DashboardPage() {
   const handleSendTest = async (stage: SequenceStage) => {
     const to = tenant?.phone_e164 || prefillPhone;
     if (!to) {
-      showToast("Sign in with your WhatsApp number to receive test messages", "info");
-      setHostAuthOpen(true);
+      showToast("Add your WhatsApp number in an event first to receive test messages", "info");
       return;
     }
     setSendingTest(true);
@@ -363,28 +361,27 @@ export default function DashboardPage() {
 
   if (loading || !tenant) {
     return (
-      <div className="min-h-screen bg-canvas flex items-center justify-center text-slate-500 text-[13px]">
-        <Loader2 className="w-4 h-4 animate-spin mr-2 text-[#1877f2]" />
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-neutral-500 text-[13px]">
+        <Loader2 className="w-4 h-4 animate-spin mr-2 text-[#111111]" />
         Loading workspace
       </div>
     );
   }
 
-  const signedIn = tenant.id !== "guest" && Boolean(tenant.phone_e164);
   const panelKey =
     view === "settings" ? "settings" : `${lifecycle}-${activeEvent?.id || "none"}`;
 
   return (
-    <div className="min-h-screen bg-canvas text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#fafafa] text-[#111111] flex flex-col">
       {/* ------------------------------ top bar ------------------------------ */}
-      <header className="sticky top-0 z-30 shrink-0 border-b border-white/[0.08] bg-canvas/90 backdrop-blur-md">
-        <div className="h-12 px-3 sm:px-4 flex items-center gap-2 sm:gap-3 min-w-0">
+      <header className="sticky top-0 z-30 shrink-0 border-b border-neutral-200 bg-white/95 backdrop-blur-md">
+        <div className="h-14 px-3 sm:px-5 flex items-center gap-2 sm:gap-3 min-w-0 max-w-[1440px] mx-auto">
           <Link href="/" aria-label="ShowUp home" className="shrink-0">
             <BrandWordmark />
           </Link>
-          <span className="h-4 w-px bg-white/[0.1] shrink-0" />
+          <span className="h-4 w-px bg-neutral-200 shrink-0" />
 
-          <nav className="flex items-center gap-0.5 shrink-0" aria-label="Primary">
+          <nav className="flex items-center gap-1 shrink-0" aria-label="Primary">
             {(["events", "settings"] as const).map((v) => {
               const active = view === v;
               return (
@@ -393,15 +390,15 @@ export default function DashboardPage() {
                   type="button"
                   onClick={() => setView(v)}
                   className={cn(
-                    "relative h-7 px-2 sm:px-2.5 rounded-md text-[12px] sm:text-[12.5px] font-medium capitalize transition-colors",
-                    active ? "text-white" : "text-slate-500 hover:text-slate-200"
+                    "relative h-8 px-3 rounded-full text-[12.5px] font-medium capitalize transition-colors",
+                    active ? "text-[#111111]" : "text-neutral-500 hover:text-[#111111]"
                   )}
                 >
                   {active && (
                     <motion.span
                       layoutId="top-nav-pill"
                       transition={SPRING_SNAPPY}
-                      className="absolute inset-0 rounded-md bg-white/[0.08]"
+                      className="absolute inset-0 rounded-full bg-[#f4f4f5] border border-neutral-200/80"
                     />
                   )}
                   <span className="relative z-10">{v}</span>
@@ -425,51 +422,38 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="ml-auto flex items-center gap-2 shrink-0">
             <span
-              className="hidden md:inline-flex items-baseline gap-1.5 font-mono tabular-nums text-[12px] text-slate-400"
+              className="hidden md:inline-flex items-baseline gap-1.5 font-mono tabular-nums text-[12px] text-neutral-500 px-2.5 py-1 rounded-full bg-[#f4f4f5]"
               title="East Africa Time"
             >
               {fmtEat(now, { seconds: true })}
-              <span className="text-[10px] text-slate-600">EAT</span>
+              <span className="text-[10px] text-neutral-400">EAT</span>
             </span>
-            <button
-              type="button"
-              onClick={() => setHostAuthOpen(true)}
-              title={signedIn ? formatPhoneDisplay(tenant.phone_e164 || "") : "Sign in"}
-              className="inline-flex items-center gap-1.5 h-7 px-2 sm:px-2.5 rounded-md border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.07] text-[12px] text-slate-300 transition"
-            >
-              {signedIn ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00a884] shrink-0" />
-                  <Smartphone className="w-3.5 h-3.5 text-slate-400 sm:hidden" />
-                  <span className="hidden sm:inline font-mono tabular-nums">
-                    {formatPhoneDisplay(tenant.phone_e164 || "")}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Smartphone className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="hidden xs:inline">Sign in</span>
-                </>
-              )}
-            </button>
             <Button
               size="sm"
               variant="brand"
+              className="h-8 px-3.5"
               onClick={() => openWizard()}
               icon={<Plus className="w-3.5 h-3.5" />}
             >
               <span className="sm:hidden">New</span>
               <span className="hidden sm:inline">New webinar</span>
             </Button>
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "w-8 h-8",
+                },
+              }}
+            />
           </div>
         </div>
 
         {/* Mobile event switcher row */}
         {view === "events" && events.length > 0 && (
-          <div className="sm:hidden px-3 py-1.5 border-t border-white/[0.06] flex items-center justify-between gap-2">
-            <span className="text-[11px] text-slate-500 shrink-0 font-medium">Room</span>
+          <div className="sm:hidden px-3 py-2 border-t border-neutral-100 flex items-center justify-between gap-2 bg-white">
+            <span className="text-[11px] text-neutral-500 shrink-0 font-medium">Room</span>
             <div className="flex-1 min-w-0">
               <EventSwitcher
                 events={events}
@@ -487,7 +471,7 @@ export default function DashboardPage() {
       </header>
 
       {/* ------------------------------ workspace ----------------------------- */}
-      <main className="flex-1 w-full max-w-[1440px] mx-auto border-x border-white/[0.06] overflow-x-hidden">
+      <main className="flex-1 w-full max-w-[1440px] mx-auto bg-white border-x border-neutral-200/80 overflow-x-hidden">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={panelKey}
@@ -509,7 +493,6 @@ export default function DashboardPage() {
             ) : lifecycle === "zero" || !activeEvent ? (
               <ZeroState
                 onCreate={() => openWizard()}
-                onSignIn={() => setHostAuthOpen(true)}
                 onTestMessage={() => handleSendTest("instant_welcome")}
                 sendingTest={sendingTest}
               />
@@ -619,16 +602,6 @@ export default function DashboardPage() {
             `WhatsApp Business connected (${updated.display_phone_number || updated.waba_id})`
           );
           loadWorkspace();
-        }}
-      />
-
-      <HostAuthModal
-        isOpen={hostAuthOpen}
-        onClose={() => setHostAuthOpen(false)}
-        onAuthenticated={async (msg) => {
-          setSelectedEventId("");
-          await loadWorkspace();
-          showToast(msg);
         }}
       />
 
